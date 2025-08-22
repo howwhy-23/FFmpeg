@@ -32,7 +32,7 @@
         html {
             filter: brightness(140%);
         }
-
+        
         ::-webkit-scrollbar {
             width: 10px;
             background-color: #151530;
@@ -227,7 +227,7 @@
             transform-origin: center;
             transition: transform 0.2s ease;
         }
-
+        
         input[type="range"]::-webkit-slider-thumb:hover {
             transform: scale(1.2);
         }
@@ -969,7 +969,7 @@
             padding-right: 0px;
             width: 70%
         }
-
+        
         #delay-input {
             border-top-left-radius: 10px;
             border-bottom-left-radius: 10px;
@@ -1218,11 +1218,11 @@
             outline: none;
             border-color: #4ecdc4;
         }
-
+        
         select, select option {
             text-align: center;
         }
-
+        
         select {
             background: rgba(15, 15, 35, 0.8);
             color: white;
@@ -1237,18 +1237,18 @@
             background-size: 16px;
             padding-right: 30px;
         }
-
+        
         select option {
             background: rgba(15, 15, 35, 0.9);
             color: white;
             padding: 10px;
         }
-
+        
         select:focus {
             outline: none;
             border-color: #4ecdc4;
         }
-
+        
         .gap-control {
             display: flex;
             gap: 10px;
@@ -1277,7 +1277,7 @@
             top: 0px;
             left: 0px;
         }
-
+        
         .return-btn:hover {
             box-shadow: 0 5px 15px rgba(255, 152, 0, 0.3);
             transform: scaleY(110%);
@@ -1786,7 +1786,7 @@
         const elementEditor = document.getElementById('element-editor');
         const editorControls = document.getElementById('editor-controls');
         const editorTitle = document.getElementById('editor-title');
-
+        
         function updateFFmpegSolutions() {
             const ffmpegFix = document.querySelector('.ffmpeg-fix');
             if (ffmpegFix) {
@@ -1806,7 +1806,7 @@
                 document.getElementById('retry-ffmpeg').addEventListener('click', initFFmpeg);
             }
         }
-
+        
         document.addEventListener('DOMContentLoaded', function() {
             // Fix for color inputs not updating bars
             function setupColorInputWithUpdate(colorInputId, hexInputId, colorVar) {
@@ -1830,10 +1830,11 @@
                         redrawVisualizer();
                     }
                 });
-
+        
                 document.getElementById('bar-gap').addEventListener('input', function() {
                     barGap = parseInt(this.value);
                     document.getElementById('bar-gap-value').textContent = barGap;
+                    calculateBarWidth(); // Update bar width based on new gap
                     redrawVisualizer();
                 });
                 
@@ -1841,19 +1842,31 @@
                 document.getElementById('bar-width').addEventListener('input', function() {
                     barWidth = parseInt(this.value);
                     document.getElementById('bar-width-value').textContent = barWidth;
+                    
+                    // Adjust bar count proportionally based on bar width
+                    const newBarCount = Math.max(4, Math.min(1000, Math.floor((visualizerCanvas.width - barGap) / (barWidth + barGap))));
+                    bars = newBarCount;
+                    document.getElementById('bar-count').value = newBarCount;
+                    document.getElementById('bar-count-value').textContent = newBarCount;
+                    
                     redrawVisualizer();
                 });
                 
-                // Bar count control
+                // Bar Count control - now linked to bar width
                 document.getElementById('bar-count').addEventListener('input', function() {
                     bars = parseInt(this.value);
                     document.getElementById('bar-count-value').textContent = bars;
-                    
-                    // Performance warning
-                    const warning = document.getElementById('bar-count-warning');
-                    warning.style.display = bars > 200 ? 'block' : 'none';
-                    
+                    calculateBarWidth(); // Calculate new bar width
                     redrawVisualizer();
+                });
+                
+                // Volume Control
+                document.getElementById('volume-control').addEventListener('input', function() {
+                    if (audioElement) {
+                        const volume = this.value / 100;
+                        audioElement.volume = volume;
+                        document.getElementById('volume-value').textContent = this.value;
+                    }
                 });
             }
             
@@ -1872,16 +1885,16 @@
             document.getElementById('bar-gap').addEventListener('input', function() {
                 barGap = parseInt(this.value);
                 document.getElementById('bar-gap-value').textContent = barGap;
-                calculateBarWidth(); // 更新基于新间隙的条宽
+                calculateBarWidth(); // Update bar width based on new gap
                 redrawVisualizer();
             });
-
+        
             // Bar Width control
             document.getElementById('bar-width').addEventListener('input', function() {
                 barWidth = parseInt(this.value);
                 document.getElementById('bar-width-value').textContent = barWidth;
                 
-                // 根据条宽按比例调整条数
+                // Adjust bar count proportionally based on bar width
                 const newBarCount = Math.max(4, Math.min(1000, Math.floor((visualizerCanvas.width - barGap) / (barWidth + barGap))));
                 bars = newBarCount;
                 document.getElementById('bar-count').value = newBarCount;
@@ -1907,7 +1920,7 @@
                 }
             });
         });
-
+        
         function calculateBarWidth() {
             const canvasWidth = visualizerCanvas.width;
             // Total space occupied by gaps between bars
@@ -1916,7 +1929,7 @@
             barWidth = Math.max(1, (canvasWidth - totalGapWidth) / bars);
             document.getElementById('bar-width-value').textContent = barWidth.toFixed(1);
         }
-
+        
         function drawBars(dataArray) {
             const width = visualizerCanvas.width;
             const height = visualizerCanvas.height;
@@ -1997,8 +2010,8 @@
             
             visualizerCtx.globalAlpha = 1.0;
         }
-
-        // High resolution bar drawing for export
+        
+        // High resolution bar drawing for export - FIXED VERSION
         function drawHighResBars(ctx, dataArray, width, height) {
             ctx.clearRect(0, 0, width, height);
             
@@ -2007,11 +2020,17 @@
                 return; // Don't draw spectrum bars during delay
             }
             
-            const totalWidth = barWidth * bars + barGap * (bars - 1);
+            // Calculate bar width and gap based on export resolution
+            const exportBarGap = barGap * (width / previewWidth);
+            const exportBarWidth = barWidth * (width / previewWidth);
+            
+            const totalWidth = exportBarWidth * bars + exportBarGap * (bars - 1);
             const startX = (width - totalWidth) / 2;
             let x = startX;
             
-            const effectiveBarRadius = bars > 200 ? 0 : Math.min(barRadius, 15);
+            // Calculate bar radius based on export resolution
+            const exportBarRadius = barRadius * (width / previewWidth);
+            const effectiveBarRadius = bars > 200 ? 0 : Math.min(exportBarRadius, 15);
             
             for (let i = 0; i < bars; i++) {
                 const barHeight = (dataArray[i] / 255) * height * barHeightMultiplier;
@@ -2054,17 +2073,17 @@
                 if (effectiveBarRadius > 0) {
                     ctx.beginPath();
                     ctx.moveTo(x + effectiveBarRadius, barY);
-                    ctx.arcTo(x + barWidth, barY, x + barWidth, barY + barDrawHeight, effectiveBarRadius);
-                    ctx.arcTo(x + barWidth, barY + barDrawHeight, x, barY + barDrawHeight, effectiveBarRadius);
+                    ctx.arcTo(x + exportBarWidth, barY, x + exportBarWidth, barY + barDrawHeight, effectiveBarRadius);
+                    ctx.arcTo(x + exportBarWidth, barY + barDrawHeight, x, barY + barDrawHeight, effectiveBarRadius);
                     ctx.arcTo(x, barY + barDrawHeight, x, barY, effectiveBarRadius);
-                    ctx.arcTo(x, barY, x + barWidth, barY, effectiveBarRadius);
+                    ctx.arcTo(x, barY, x + exportBarWidth, barY, effectiveBarRadius);
                     ctx.closePath();
                     ctx.fill();
                 } else {
-                    ctx.fillRect(x, barY, barWidth, barDrawHeight);
+                    ctx.fillRect(x, barY, exportBarWidth, barDrawHeight);
                 }
                 
-                x += barWidth + barGap;
+                x += exportBarWidth + exportBarGap;
             }
             
             ctx.globalAlpha = 1.0;
@@ -2084,6 +2103,8 @@
             visualizerCanvas.height = height;
             elementsCanvas.width = width;
             elementsCanvas.height = height;
+            
+            calculateBarWidth(); // Recalculate bar width on resize
             
             drawBackground();
             drawElements();
@@ -2161,9 +2182,9 @@
                 ctx.fillStyle = 'rgba(255, 107, 107, 0.15)';
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
-                ctx.bezierCurveTo(width * 0.3, height * 0.25, width * 0.7, height * 0.25, width, 0);
+                ctx.bezierCurveTo(width * 0.3, height * 25, width * 0.7, height * 25, width, 0);
                 ctx.lineTo(width, height * 0.3);
-                ctx.bezierCurveTo(width * 0.7, height * 0.45, width * 0.3, height * 0.45, 0, height * 0.3);
+                ctx.bezierCurveTo(width * 0.7, height * 45, width * 0.3, height * 45, 0, height * 0.3);
                 ctx.closePath();
                 ctx.fill();
             }
@@ -2179,7 +2200,7 @@
                 ctx.fillRect(0, centerY - centerLineThickness/2, width, centerLineThickness);
             }
         }
-
+        
         // Draw background
         function drawBackground() {
             const width = backgroundCanvas.width;
@@ -2314,7 +2335,7 @@
             const reader = new FileReader();
             reader.onload = function(event) {
                 const img = new Image();
-                img.onload = function() {
+            img.onload = function() {
                     backgroundImage = img;
                     currentBackground = 'custom';
                     drawBackground();
@@ -2422,7 +2443,7 @@
             // Reset play button when audio ends
             audioElement.addEventListener('ended', function() {
                 isPlaying = false;
-                document.getElementById('play-pause').innerHTML = '<i class="fas fa-play"></i>';
+                document.getElementById('play-pause').innerHTML = '<i class="fas fa-play></i>';
             });
         }
         
@@ -2552,7 +2573,7 @@
                     
                     // Apply blur if set
                     if (element.blur > 0) {
-                        ctx.filter = `blur(${element.blur}px)`;
+                        ctx.filter = `blur(${element.blur * scaleX}px)`;
                     }
                     
                     if (element.type === 'text') {
@@ -3011,7 +3032,7 @@
                         element.height = parseInt(this.value);
                         document.getElementById('element-height-range').value = element.height;
                         if (document.getElementById('preserve-aspect').checked && element.aspectRatio) {
-                            element.width = element.height * element.aspectRatio;
+                            element.width = element.height * element.asceptRatio;
                             document.getElementById('element-width').value = Math.round(element.width);
                             document.getElementById('element-width-range').value = Math.round(element.width);
                         }
@@ -3164,7 +3185,7 @@
                 document.querySelector('.bg-option[data-bg="gradient"]').classList.add('active');
                 document.getElementById('bg-upload-container').style.display = 'none';
             }
-
+        
             // Remove from list
             document.querySelectorAll('.element-item').forEach(item => {
                 if (parseInt(item.dataset.id) === id) {
@@ -3208,7 +3229,7 @@
                 blur: 0,
                 delay: 0
             };
-
+        
             elements.push(sampleText);
             addElementToList(sampleText);
             lastInteractedElement = sampleText;
@@ -3245,7 +3266,7 @@
                             const stepValue = parseFloat(input.step) || 0.5;
                             input.value = (parseFloat(input.value) + (step * stepValue)).toFixed(1);
                         }
-                        // 触发input事件，让其他监听器响应
+                        // Trigger input event to update other listeners
                         input.dispatchEvent(new Event('input'));
                     }
                 }
@@ -3262,11 +3283,11 @@
                 If checked, please try to reload this page.`;
                 throw new Error(errorMsg);
             }
-
+        
             try {
                 const { createFFmpeg, fetchFile } = FFmpeg;
                 fetchFileGlobal = fetchFile; // Save fetchFile
-
+        
                 // Increase WebAssembly memory limits
                 WebAssembly.Memory.prototype.grow = function (pages) {
                     const maxPages = 16384; // 1GB memory
@@ -3321,9 +3342,9 @@
                 document.getElementById('ffmpeg-status').textContent = `Initialization failed: ${outerError.message}`;
             }
         }
-        
-        // Retry FFmpeg initialization
-        document.getElementById('retry-ffmpeg').addEventListener('click', function() {
+
+// Retry FFmpeg initialization
+document.getElementById('retry-ffmpeg').addEventListener('click', function() {
             initFFmpeg();
         });
         
