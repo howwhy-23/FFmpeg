@@ -1,0 +1,3766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin" />
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Advanced music visualizer with export capabilities">
+    <title>FFmuvisual</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: #e6e6e6;
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: #4ecdc4 rgba(20,20,40,0.8);
+        }
+        
+        html {
+            filter: brightness(140%);
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            background-color: #151530;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, #4ecdc4, #36d1dc);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            padding: 30px 0;
+            margin-bottom: 30px;
+            background: linear-gradient(90deg, rgba(74, 74, 113, 0.9), rgba(32, 136, 131, 0.9));
+            border-radius: 15px;
+            box-shadow: 
+            10px 10px 30px rgba(0, 0, 0, 0.5),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(78, 205, 196, 0.3);
+        }
+        
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, 
+            rgba(255, 107, 107, 0.1) 0%, 
+            rgba(78, 205, 196, 0.1) 50%, 
+            rgba(91, 134, 229, 0.1) 100%);
+            z-index: 1;
+        }
+        
+        header span {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #5b86e5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            letter-spacing: 1px;
+            position: relative;
+            z-index: 2;
+            font-weight: 800;
+        }
+        
+        .subtitle {
+            font-size: 1.4rem;
+            color: #c0c0ff;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+            position: relative;
+            z-index: 2;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 30px;
+        }
+        
+        .control-panel {
+            background: rgba(22, 22, 70, 0.95);
+            border-top-left-radius: 15px;
+            border-bottom-left-radius: 15px;
+            padding: 25px;
+            box-shadow: 
+                0 10px 30px rgba(0, 0, 0, 0.5),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            max-height: 110vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #4ecdc4 rgba(20,20,40,0.8);
+            border: 2px solid rgba(78, 205, 196, 0.3);
+        }
+        
+        .control-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .control-panel::-webkit-scrollbar-thumb {
+            background: linear-gradient(to bottom, #4ecdc4, #36d1dc);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .panel-section {
+            padding: 20px;
+            background: rgba(65, 65, 115, 0.8);
+            border-radius: 12px;
+            box-shadow: 
+                inset 0 0 10px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(78, 205, 196, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .panel-section:hover {
+            box-shadow: 
+                inset 0 0 15px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(78, 205, 196, 0.3);
+            border: 1px solid rgba(78, 205, 196, 0.3);
+        }
+        
+        h2 {
+            font-size: 1.7rem;
+            margin-bottom: 20px;
+            color: #4ecdc4;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        h2 i {
+            font-size: 1.4rem;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #b0b0ff;
+        }
+        
+        .input-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        input[type="range"], input[type="number"], input[type="color"], input[type="file"], input[type="checkbox"], select {
+            width: 100%;
+            padding: 0px;
+            background: rgba(15, 15, 35, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 7px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        input[type="range"]:hover, input[type="number"]:hover, 
+        input[type="color"]:hover, input[type="file"]:hover,
+        input[type="checkbox"]:hover, select:hover {
+            border-color: #4ecdc4;
+            box-shadow: 0 0 8px rgba(78, 205, 196, 0.5);
+        }
+        
+        /* Fixed Range Control */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 5px;
+            background: rgba(15, 15, 35, 0.8);
+            border-radius: 4px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 1    0%;
+            background: #4ecdc4;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(78, 205, 196, 0.8);
+            border: 2px solid white;
+            margin-top: -9px;
+            transform: scaleY(0.5);
+            transform-origin: center;
+            transition: transform 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right, #4ecdc4, #36d1dc);
+            border-radius: 4px;
+        }
+        
+        .btn {
+            display: inline-block;
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(90deg, #ff6b6b, #ff8e53);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 10px rgba(255, 107, 107, 0.3);
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .btn:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: 0.5s;
+            z-index: -1;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 7px 20px rgba(255, 107, 107, 0.5);
+        }
+        
+        .btn:hover:before {
+            left: 100%;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(90deg, #36d1dc, #5b86e5);
+            box-shadow: 0 4px 10px rgba(54, 209, 220, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 7px 20px rgba(54, 209, 220, 0.5);
+        }
+        
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 0.9rem;
+            width: auto;
+            display: inline-block;
+        }
+        
+        .visualization-area {
+            position: relative;
+            background: rgba(10, 10, 25, 0.9);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 
+                0 10px 30px rgba(0, 0, 0, 0.5),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+            height: 478px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(78, 205, 196, 0.3);
+            aspect-ratio: 16/9;
+        }
+        
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            border-top: #52748b 2px solid;
+            border-left: #52748b 2px solid;
+            border-right: #52748b 2px solid;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            border-top-left-radius: 14px;
+            border-top-right-radius: 14px;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #background-layer {
+            z-index: 1;
+        }
+        
+        #visualizer-layer {
+            z-index: 2;
+        }
+        
+        #elements-layer {
+            z-index: 3;
+        }
+        
+        .player-controls {
+            background: rgba(20, 132, 173, 0.95);
+            padding: 15px 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 2px solid rgba(255, 255, 255, 0.1);
+            border-bottom-left-radius: 15px;
+            border-bottom-right-radius: 15px;
+        }
+        
+        .control-btn {
+            background: transparent;
+            border: none;
+            color: #e6e6e6;
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            padding: 5px 15px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 50px;
+            height: 50px;
+        }
+        
+        .control-btn:hover {
+            background: rgba(78, 205, 196, 0.2);
+            color: #4ecdc4;
+            transform: scale(1.1);
+        }
+        
+        .time-display {
+            font-family: monospace;
+            font-size: 1.1rem;
+            color: #a0a0a0;
+            min-width: 140px;
+            text-align: center;
+        }
+        
+        .progress-container {
+            flex: 1;
+            margin: 0 20px;
+            height: 8px;
+            background: rgba(15, 15, 35, 0.8);
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ff8e53);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+        
+        .elements-list {
+            background: rgba(15, 15, 35, 0.8);
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .element-item {
+            padding: 12px;
+            background: rgba(30, 30, 50, 0.6);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+        }
+        
+        .element-item:hover {
+            background: rgba(40, 40, 70, 0.7);
+            border-color: rgba(78, 205, 196, 0.3);
+            box-shadow: 0 0 10px rgba(78, 205, 196, 0.2);
+        }
+        
+        .element-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .element-controls {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .element-controls button {
+            background: rgba(50, 50, 80, 0.7);
+            border: none;
+            color: #e6e6e6;
+            cursor: pointer;
+            padding: 6px 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .element-controls button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .element-controls .delete-btn:hover {
+            background: rgba(255, 107, 107, 0.3);
+            color: #ff6b6b;
+        }
+        
+        .element-controls .copy-btn:hover {
+            background: rgba(78, 205, 196, 0.3);
+            color: #4ecdc4;
+        }
+        
+        .element-controls .add-btn:hover {
+            background: rgba(91, 134, 229, 0.3);
+            color: #5b86e5;
+        }
+        
+        .quality-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .quality-option {
+            background: rgba(15, 15, 35, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+        
+        .quality-option:hover, .quality-option.active {
+            border-color: #4ecdc4;
+            background: rgba(54, 209, 220, 0.15);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .quality-option h3 {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+            color: #4ecdc4;
+        }
+        
+        .quality-option p {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+        }
+        
+        .instructions {
+            background: rgba(255, 107, 107, 0.1);
+            border-left: 4px solid #ff6b6b;
+            padding: 18px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-top: 20px;
+            border: 1px solid rgba(255, 107, 107, 0.2);
+        }
+        
+        .instructions h3 {
+            color: #ff6b6b;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .instructions p {
+            margin-bottom: 0px;
+        }
+        
+        /* Element Editor */
+        .element-editor {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(25, 25, 45, 0.95);
+            border-radius: 10px 10px 0 0;
+            padding: 15px;
+            z-index: 1000;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(78, 205, 196, 0.3);
+            display: none;
+            height: 45vh; /* 45% of viewport height */
+            overflow: hidden;
+            transition: height 0.3s ease;
+        }
+        
+        .element-editor h3 {
+            margin-bottom: 15px;
+            color: #4ecdc4;
+            font-size: 1.3rem;
+        }
+        
+        .editor-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 12px;
+            max-height: calc(100% - 70px);
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .editor-controls .control-group {
+            margin-bottom: 10px;
+        }
+        
+        .editor-controls label {
+            font-size: 0.9rem;
+        }
+        
+        .editor-controls input {
+            padding: 0px;
+        }
+        
+        .element-outline {
+            position: absolute;
+            border: 2px dashed #ff6b6b;
+            pointer-events: none;
+            z-index: 99;
+            display: none;
+        }
+        
+        .shortcut-help {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: rgba(255, 107, 107, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+            border: 2px solid rgba(255,255,255,0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .shortcut-help:hover {
+            background: rgba(255, 107, 107, 1);
+            transform: scale(1.1);
+        }
+        
+        .shortcut-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(25, 25, 45, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            width: 80%;
+            max-width: 600px;
+            z-index: 1000;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: none;
+            border: 1px solid rgba(255,255,255,0.15);
+            border: 1px solid rgba(78, 205, 196, 0.3);
+        }
+        
+        .shortcut-panel h2 {
+            color: #ff6b6b;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        
+        .shortcut-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .shortcut-item {
+            background: rgba(35, 35, 60, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .shortcut-key {
+            background: rgba(255, 107, 107, 0.3);
+            padding: 8px 15px;
+            border-radius: 6px;
+            min-width: 100px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .close-shortcuts {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            color: #a0a0a0;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        
+        .export-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 40, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            z-index: 1000;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.7);
+            display: none;
+            border: 1px solid rgba(255,255,255,0.15);
+            border: 1px solid rgba(78, 205, 196, 0.3);
+        }
+        
+        .export-modal h2 {
+            color: #4ecdc4;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .export-progress {
+            width: 100%;
+            height: 25px;
+            background: rgba(15, 15, 35, 0.8);
+            border-radius: 12px;
+            margin: 20px 0;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+        
+        .export-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ff8e53);
+            border-radius: 12px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .export-status {
+            text-align: center;
+            margin: 15px 0;
+            color: #a0a0a0;
+            font-size: 1.1rem;
+        }
+        
+        .export-details {
+            text-align: center;
+            margin: 15px 0;
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+        
+        .export-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .export-btn {
+            padding: 12px 25px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .export-btn.cancel {
+            background: rgba(255, 107, 107, 0.8);
+            color: white;
+        }
+        
+        .export-btn.cancel:hover {
+            background: rgba(255, 107, 107, 1);
+        }
+        
+        .file-upload-container {
+            position: relative;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        
+        .file-upload-btn {
+            display: block;
+            padding: 12px;
+            background: rgba(15, 15, 35, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            color: white;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .file-upload-btn:hover {
+            background: rgba(35, 35, 60, 0.8);
+            border-color: #4ecdc4;
+        }
+        
+        .file-upload-container input[type="file"] {
+            position: absolute;
+            top: 0;
+            right: 0;
+            min-width: 100%;
+            min-height: 100%;
+            font-size: 100px;
+            text-align: right;
+            filter: alpha(opacity=0);
+            opacity: 0;
+            outline: none;
+            cursor: pointer;
+            display: block;
+        }
+        
+        .file-name {
+            margin-top: 5px;
+            font-size: 0.9rem;
+            color: #a0a0a0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .bg-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .bg-option {
+            height: 70px;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+        }
+        
+        .bg-option:hover, .bg-option.active {
+            border-color: #4ecdc4;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(78, 205, 196, 0.3);
+        }
+        
+        .bg-option img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .bg-option .bg-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            padding: 3px;
+            text-align: center;
+            font-size: 0.7rem;
+        }
+        
+        .performance-warning {
+            color: #ff6b6b;
+            font-size: 0.8rem;
+            margin-top: 5px;
+            display: none;
+        }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .bar-mode-selectors {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .mirror-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .center-line-settings {
+            padding: 15px;
+            background: rgba(30, 30, 50, 0.5);
+            border-radius: 8px;
+            margin-top: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: none; /* Hidden by default */
+        }
+        
+        .adjuster {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        
+        .adjuster-btn {
+            width: 30px;
+            height: 30px;
+            background: rgba(78, 205, 196, 0.3);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        
+        .adjuster-btn:hover {
+            background: rgba(78, 205, 196, 0.6);
+            transform: scale(1.05);
+        }
+        
+        .element-name-input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 1rem;
+            width: 100%;
+            padding: 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .element-name-input:focus {
+            outline: none;
+            border-color: #4ecdc4;
+        }
+        
+        /* Editor top drag bar */
+        .editor-resize-handle {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 10px;
+            background: rgb(255, 255, 255);
+            cursor: row-resize;
+            z-index: 1001;
+        }
+        
+        /* Editor close button */
+        .editor-close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            color: #ff6b6b;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 1001;
+        }
+        
+        /* Sliders for editor position and size */
+        .editor-slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        /* Style adjustments for color inputs */
+        input[type="color"] {
+            height: 2px;
+            padding: 0;
+        }
+        
+        /* Adjustment for delay input */
+        #delay-input-container {
+            position: relative;
+        }
+        
+        #delay-input-container .adjuster {
+            position: absolute;
+            top: 20px;
+            right: 0px;
+        }
+        
+        #delay-input {
+            padding-right: 0px;
+            width: 70%
+        }
+
+        #delay-input {
+            border-top-left-radius: 10px;
+            border-bottom-left-radius: 10px;
+            border-top-right-radius: 0px !important;
+            border-bottom-right-radius: 0px !important;
+            text-align: center;
+            font-size: large;
+        }
+        
+        .resolution-warning {
+            background: rgba(255, 107, 107, 0.1);
+            border-left: 4px solid #ff6b6b;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 0.85rem;
+        }
+        
+        .resolution-warning i {
+            color: #ff6b6b;
+            margin-right: 8px;
+        }
+        
+        @media (max-width: 1100px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .visualization-area {
+                height: auto;
+            }
+        }
+        
+        footer {
+            margin-top: 30px;
+            text-align: center;
+            padding: 20px 0;
+            color: #c6c6c6;
+            font-size: 0.9rem;
+        }
+        
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        .glow-effect {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(20px);
+            z-index: -1;
+        }
+        
+        .glow-1 {
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(255, 107, 107, 0.2) 0%, transparent 70%);
+            top: -100px;
+            right: -100px;
+        }
+        
+        .glow-2 {
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(78, 205, 196, 0.15) 0%, transparent 70%);
+            bottom: -150px;
+            left: -100px;
+        }
+        
+        .glow-3 {
+            width: 250px;
+            height: 250px;
+            background: radial-gradient(circle, rgba(91, 134, 229, 0.15) 0%, transparent 70%);
+            top: 40%;
+            left: 20%;
+        }
+        
+        /* FFmpeg status optimization */
+        .ffmpeg-status {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 15px auto;
+            text-align: center;
+            max-width: 80%;
+            transition: all 0.5s ease;
+        }
+        
+        .ffmpeg-status.ready {
+            background: rgba(78, 205, 196, 0.2);
+            color: #4ecd5f;
+            font-size: 1.1rem;
+        }
+        
+        .ffmpeg-fix {
+            margin-top: 10px;
+            padding: 15px;
+            background: rgba(78, 205, 196, 0.15);
+            border-radius: 8px;
+            border: 1px solid rgba(78, 205, 196, 0.3);
+        }
+        
+        .ffmpeg-fix h3 {
+            color: #4ecdc4;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .ffmpeg-fix ul {
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+        
+        .ffmpeg-fix li {
+            margin-bottom: 8px;
+        }
+        
+        .ffmpeg-fix .btn {
+            margin-top: 10px;
+        }
+        
+        /* Blur effect during export */
+        .blur-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            backdrop-filter: blur(5px);
+            z-index: 999;
+            display: none;
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Volume control */
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .volume-container i {
+            font-size: 1.2rem;
+            color: #4ecdc4;
+        }
+        
+        /* Element opacity control */
+        .opacity-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* Export completion controls */
+        .export-complete-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        /* Export completion modal */
+        .export-complete-modal {
+            display: none;
+        }
+        
+        /* Color picker enhancements */
+        .color-control-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        
+        .color-control-container input[type="color"] {
+            width: 100px;
+            height: 10px;
+            border-radius: 0px !important;
+        }
+        
+        .hex-input {
+            background: rgba(15, 15, 35, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+            color: white;
+            padding: 6px;
+            width: calc(100% - 70px);
+            font-size: 0.9rem;
+        }
+        
+        .hex-input:focus {
+            outline: none;
+            border-color: #4ecdc4;
+        }
+        
+        /* Filename modal */
+        .filename-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 40, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            z-index: 1000;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.7);
+            display: none;
+            border: 1px solid rgba(78, 205, 196, 0.3);
+        }
+        
+        .filename-modal h2 {
+            color: #4ecdc4;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .filename-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 25px;
+        }
+        
+        .filename-input {
+            width: 100%;
+            padding: 12px;
+            background: rgba(15, 15, 35, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            color: white;
+            font-size: 1.1rem;
+        }
+        
+        .filename-input:focus {
+            outline: none;
+            border-color: #4ecdc4;
+        }
+
+        select, select option {
+            text-align: center;
+        }
+
+        select {
+            background: rgba(15, 15, 35, 0.8);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.15);
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 16px;
+            padding-right: 30px;
+        }
+
+        select option {
+            background: rgba(15, 15, 35, 0.9);
+            color: white;
+            padding: 10px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #4ecdc4;
+        }
+
+        .gap-control {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .return-btn {
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: fixed;
+            display: flex;
+            z-index: 1000;
+            background: linear-gradient(90deg, #e4a443, #bd7913);
+            border-bottom-right-radius: 20px;
+            border-top-right-radius: 5px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            font-size: 1.2rem;
+            color: #fff;
+            transform-origin: top;
+            border: 0px solid rgba(2, 119, 189, 0.258);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            width: 150px;
+            height: 50px;
+            justify-content: center;
+            align-items: center;
+            top: 0px;
+            left: 0px;
+        }
+
+        .return-btn:hover {
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.3);
+            transform: scaleY(110%);
+        }
+
+    </style>
+</head>
+<body>
+    <div class="particles">
+        <div class="glow-effect glow-1"></div>
+        <div class="glow-effect glow-2"></div>
+        <div class="glow-effect glow-3"></div>
+    </div>
+    
+    <!-- Blur overlay during export -->
+    <div class="blur-overlay" id="blur-overlay"></div>
+    <button class="return-btn" onclick="window.location.href='Switch_Interface.html'"><i class="fas fa-undo"></i></button>
+    
+    <div class="container">
+        <header>
+            <span>FFmuvisual</span>
+            <p class="subtitle">FFmpeg + Music + Visualization = Massive Product</p>
+        </header>
+
+        <!-- FFmpeg status display -->
+        <div id="ffmpeg-status" class="ffmpeg-status">
+            <i class="fas fa-spinner fa-spin"></i> Loading FFmpeg...
+        </div>
+        
+        <div class="main-content">
+            <div class="control-panel">
+                <div class="panel-section">
+                    <h2><i class="fas fa-sliders-h"></i> Audio Settings</h2>
+                    <div class="control-group">
+                        <label for="audio-upload">Upload MP3 File</label>
+                        <div class="file-upload-container">
+                            <div class="file-upload-btn">
+                                <i class="fas fa-upload"></i> Select MP3 File
+                            </div>
+                            <input type="file" id="audio-upload" accept=".mp3">
+                        </div>
+                        <div class="file-name" id="audio-file-name"></div>
+                    </div>
+                    
+                    <!-- Volume Control -->
+                    <div class="control-group">
+                        <label for="volume-control">Volume: <span id="volume-value">100</span>%</label>
+                        <div class="volume-container">
+                            <i class="fas fa-volume-up"></i>
+                            <input type="range" id="volume-control" min="0" max="100" value="100">
+                            <div class="adjuster">
+                                <button class="adjuster-btn" data-target="volume-control" data-direction="down">-</button>
+                                <button class="adjuster-btn" data-target="volume-control" data-direction="up">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="bar-count">Frequency Bars: <span id="bar-count-value">150</span></label>
+                        <div class="input-container">
+                            <input type="range" id="bar-count" min="4" max="1000" value="150">
+                            <div class="adjuster">
+                                <button class="adjuster-btn" data-target="bar-count" data-direction="down">-</button>
+                                <button class="adjuster-btn" data-target="bar-count" data-direction="up">+</button>
+                            </div>
+                        </div>
+                        <div class="performance-warning" id="bar-count-warning">⚠️ High bar count may affect performance</div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="bar-height">Bar Height: <span id="bar-height-value">100</span>%</label>
+                        <div class="input-container">
+                            <input type="range" id="bar-height" min="5" max="200" value="100">
+                            <div class="adjuster">
+                                <button class="adjuster-btn" data-target="bar-height" data-direction="down">-</button>
+                                <button class="adjuster-btn" data-target="bar-height" data-direction="up">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="bar-opacity">Bar Opacity: <span id="bar-opacity-value">100</span>%</label>
+                        <div class="input-container">
+                            <input type="range" id="bar-opacity" min="10" max="100" value="100">
+                            <div class="adjuster">
+                                <button class="adjuster-btn" data-target="bar-opacity" data-direction="down">-</button>
+                                <button class="adjuster-btn" data-target="bar-opacity" data-direction="up">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="bar-radius">Bar Radius: <span id="bar-radius-value">3</span>px</label>
+                        <div class="input-container">
+                            <input type="range" id="bar-radius" min="0" max="15" value="3">
+                            <div class="adjuster">
+                                <button class="adjuster-btn" data-target="bar-radius" data-direction="down">-</button>
+                                <button class="adjuster-btn" data-target="bar-radius" data-direction="up">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="bar-gap">Bar Gap: <span id="bar-gap-value">10</span>px</label>
+                        <div class="input-container">
+                            <input type="range" id="bar-gap" min="0" max="50" value="10">
+                            <div class="adjuster">
+                            <button class="adjuster-btn" data-target="bar-gap" data-direction="down">-</button>
+                            <button class="adjuster-btn" data-target="bar-gap" data-direction="up">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="bar-width">Bar Width: <span id="bar-width-value">5</span>px</label>
+                        <div class="input-container">
+                            <input type="range" id="bar-width" min="1" max="50" value="5">
+                            <div class="adjuster">
+                                <button class="adjuster-btn" data-target="bar-width" data-direction="down">-</button>
+                                <button class="adjuster-btn" data-target="bar-width" data-direction="up">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="top-bar-color">Top Bar Color</label>
+                        <div class="color-control-container">
+                            <input type="color" id="top-bar-color" value="#ffff6e">
+                            <input type="text" id="top-bar-hex" class="hex-input" value="#ffff6e" maxlength="9" placeholder="#RRGGBB">
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="bottom-bar-color">Bottom Bar Color</label>
+                        <div class="color-control-container">
+                            <input type="color" id="bottom-bar-color" value="#005573">
+                            <input type="text" id="bottom-bar-hex" class="hex-input" value="#005573" maxlength="9" placeholder="#RRGGBB">
+                        </div>
+                    </div>
+                    
+                    <div class="control-group" id="delay-input-container">
+                        <label for="delay-input">Display Delay (seconds)</label>
+                        <div class="input-container">
+                            <input type="number" id="delay-input" min="0" max="30" value="0" step="0.5" >
+                            <div class="adjuster">
+                                <button class="adjuster-btn" data-target="delay-input" data-direction="down">-</button>
+                                <button class="adjuster-btn" data-target="delay-input" data-direction="up">+</button>
+                            </div>
+                        </div>
+                        <small style="color: #a0a0a0; display: block; margin-top: 5px;">Delay showing frequency bars after audio starts</small>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Bar Mode</label>
+                        <div class="bar-mode-selectors">
+                            <div>
+                                <label for="from-select">From:</label>
+                                <select id="from-select">
+                                    <option value="bottom">Bottom</option>
+                                    <option value="center">Center</option>
+                                    <option value="top">Top</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="until-select">Until:</label>
+                                <select id="until-select">
+                                    <option value="top">Top</option>
+                                    <option value="bottom">Bottom</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mirror-option" id="mirror-option" style="display: none;">
+                            <input type="checkbox" id="mirror-checkbox">
+                            <label for="mirror-checkbox" style="position: relative; width: 350px; top: 2px; left: -40px;">Mirror Bars</label>
+                        </div>
+                    </div>
+                    
+                    <div class="center-line-settings" id="center-line-settings">
+                        <h3>Center Line Settings</h3>
+                        <div class="control-group">
+                            <label for="line-thickness">Line Thickness (px)</label>
+                            <input type="number" id="line-thickness" min="0" max="10" value="1">
+                        </div>
+                        <div class="control-group">
+                            <label for="line-left-color">Left Color</label>
+                            <div class="color-control-container">
+                                <input type="color" id="line-left-color" value="#ffffff">
+                                <input type="text" id="line-left-hex" class="hex-input" value="#ffffff" maxlength="9" placeholder="#RRGGBB">
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label for="line-right-color">Right Color</label>
+                            <div class="color-control-container">
+                                <input type="color" id="line-right-color" value="#ff6b6b">
+                                <input type="text" id="line-right-hex" class="hex-input" value="#ff6b6b" maxlength="9" placeholder="#RRGGBB">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Background</label>
+                        <div class="bg-selector">
+                            <div class="bg-option active" data-bg="gradient">
+                                <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='70'><linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='%230f0c29'/><stop offset='100%' stop-color='%23302b63'/></linearGradient><rect width='100%' height='100%' fill='url(%23grad)'/></svg>" alt="Gradient">
+                                <div class="bg-label">Gradient</div>
+                            </div>
+                            <div class="bg-option" data-bg="luxury1">
+                                <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='70'><rect width='100%' height='100%' fill='%23212142'/><circle cx='30' cy='20' r='10' fill='%23ff6b6b' opacity='0.6'/><circle cx='70' cy='50' r='15' fill='%234ecdc4' opacity='0.6'/><path d='M10,60 L90,10' stroke='%235b86e5' stroke-width='2' opacity='0.5'/></svg>" alt="Luxury 1">
+                                <div class="bg-label">Pattern 1</div>
+                            </div>
+                            <div class="bg-option" data-bg="luxury2">
+                                <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='70'><rect width='100%' height='100%' fill='%231a1a33'/><path d='M0,35 Q50,10 100,35 T100,70 Q50,95 0,70 Z' fill='%234ecdc4' opacity='0.1'/><path d='M0,0 Q50,25 100,0 T100,35 Q50,60 0,35 Z' fill='%23ff6b6b' opacity='0.1'/></svg>" alt="Luxury 2">
+                                <div class="bg-label">Pattern 2</div>
+                            </div>
+                            <div class="bg-option" data-bg="custom">
+                                <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#151530;">
+                                    <i class="fas fa-upload" style="font-size:1.5rem;"></i>
+                                </div>
+                                <div class="bg-label">Custom Image</div>
+                            </div>
+                        </div>
+                        <div class="file-upload-container" id="bg-upload-container" style="display:none;margin-top:10px;">
+                            <div class="file-upload-btn">
+                                <i class="fas fa-image"></i> Upload Background
+                            </div>
+                            <input type="file" id="bg-upload" accept="image/*">
+                        </div>
+                        <div class="file-name" id="bg-file-name"></div>
+                    </div>
+                </div>
+                
+                <div class="panel-section">
+                    <h2><i class="fas fa-plus-circle"></i> Add Elements</h2>
+                    <button id="add-text" class="btn" style="filter:brightness(0.9)">
+                        <i class="fas fa-font"></i> Add Text
+                    </button>
+                    <div class="control-group">
+                        <label for="image-upload">Add Image</label>
+                        <div class="file-upload-container">
+                            <div class="file-upload-btn">
+                                <i class="fas fa-image"></i> Select Image
+                            </div>
+                            <input type="file" id="image-upload" accept="image/*">
+                        </div>
+                        <div class="file-name" id="image-file-name"></div>
+                    </div>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="preserve-aspect" checked>
+                        <label for="preserve-aspect" style="position: relative; width: 500px; top: 2px; left: -30px;">Preserve Aspect Ratio</label>
+                    </div>
+                    
+                    <!-- Removed video upload section -->
+                    
+                    <h3 style="margin: 20px 0 10px; color: #ff6b6b">Current Elements</h3>
+                    <div class="elements-list" id="elements-list">
+                        <!-- Elements will be added dynamically -->
+                    </div>
+                </div>
+                
+                <div class="panel-section">
+                    <h2><i class="fas fa-file-export"></i> Export Settings</h2>
+                    <div class="control-group">
+                        <label for="resolution-select">Resolution</label>
+                        <select id="resolution-select">
+                            <option value="1920x1080">Full HD (1920x1080)</option>
+                            <option value="1280x720">HD (1280x720)</option>
+                            <option value="854x480">480p</option>
+                            <option value="640x360">360p</option>
+                        </select>
+                        <div class="resolution-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Higher resolutions require more processing power and time
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="fps-select">Frame Rate</label>
+                        <select id="fps-select">
+                            <option value="60">60 FPS</option>
+                            <option value="30">30 FPS</option>
+                            <option value="24">24 FPS</option>
+                        </select>
+                    </div>
+                    
+                    <button id="export-video" class="btn btn-secondary" style="filter:brightness(0.8)">
+                        <i class="fas fa-download"></i> Export Video &nbsp&nbsp *FFmpeg Must Ready
+                    </button>
+                </div>
+                
+                <div class="ffmpeg-fix">
+                    <h3><i class="fas fa-info-circle"></i> FFmpeg Loading Solutions</h3>
+                    <p>If FFmpeg fails to load, try the following steps:</p>
+                    <ul>
+                        <li>Use the latest version of Chrome or Edge browser</li>
+                        <li>Ensure the browser allows the use of SharedArrayBuffer</li>
+                        <li>Access this page using HTTPS protocol</li>
+                        <li>Close unnecessary browser tabs to free up memory</li>
+                    </ul>
+                    <button id="retry-ffmpeg" class="btn btn-sm" type="button">Reload FFmpeg</button>
+                </div>
+                
+                <div class="instructions">
+                    <h3><i class="fas fa-info-circle"></i> Instructions</h3>
+                    <p>1. Upload an MP3 file to start visualization</p>
+                    <p>2. Adjust bar settings and add custom elements</p>
+                    <p>3. Double-click text elements to edit content</p>
+                    <p>4. Select export quality settings</p>
+                    <p>5. Export high-quality video</p>
+                </div>
+            </div>
+            
+            <div class="visualization-area">
+                <div id="canvas-container">
+                    <canvas id="background-layer"></canvas>
+                    <canvas id="visualizer-layer"></canvas>
+                    <canvas id="elements-layer"></canvas>
+                    <div class="element-outline" id="element-outline"></div>
+                </div>
+                <div class="player-controls">
+                    <button class="control-btn" id="jump-start" title="Jump to Start"><i class="fas fa-step-backward"></i></button>
+                    <button class="control-btn" id="back-1s" title="Back 1s"><i class="fas fa-backward"></i></button>
+                    <button class="control-btn" id="play-pause" title="Play/Pause"><i class="fas fa-play"></i></button>
+                    <button class="control-btn" id="forward-1s" title="Forward 1s"><i class="fas fa-forward"></i></button>
+                    <button class="control-btn" id="jump-end" title="Jump to End"><i class="fas fa-step-forward"></i></button>
+                    
+                    <div class="progress-container" id="progress-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                    
+                    <div class="time-display" id="time-display">0:00 / 0:00</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="element-editor" id="element-editor">
+        <div class="editor-resize-handle" id="editor-resize-handle"></div>
+        <button class="editor-close-btn" id="close-editor">&times;</button>
+        <h3 id="editor-title"><i class="fas fa-edit"></i> Edit Element</h3>
+        <div class="editor-controls" id="editor-controls">
+            <!-- Controls will be populated dynamically based on element type -->
+        </div>
+    </div>
+    
+    <div class="shortcut-help" id="shortcut-help">?</div>
+    
+    <div class="shortcut-panel" id="shortcut-panel">
+        <button class="close-shortcuts" id="close-shortcuts">&times;</button>
+        <h2><i class="fas fa-keyboard"></i> Shortcut Reference</h2>
+        <div class="shortcut-grid">
+            <div class="shortcut-item">
+                <div class="shortcut-key">Double Click</div>
+                <div>Edit text element</div>
+            </div>
+            <div class="shortcut-item">
+                <div class="shortcut-key">Delete</div>
+                <div>Delete selected element</div>
+            </div>
+            <div class="shortcut-item">
+                <div class="shortcut-key">Space</div>
+                <div>Play/Pause audio</div>
+            </div>
+            <div class="shortcut-item">
+                <div class="shortcut-key">← →</div>
+                <div>Seek audio (1s)</div>
+            </div>
+            <div class="shortcut-item">
+                <div class="shortcut-key">Shift + ← →</div>
+                <div>Seek audio (5s)</div>
+            </div>
+            <div class="shortcut-item">
+                <div class="shortcut-key">Esc</div>
+                <div>Close panels</div>
+            </div>
+            <div class="shortcut-item">
+                <div class="shortcut-key">Ctrl + Z</div>
+                <div>Undo action</div>
+            </div>
+            <div class="shortcut-item">
+                <div class="shortcut-key">Ctrl + Y</div>
+                <div>Redo action</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="export-modal" id="export-modal">
+        <h2><i class="fas fa-download"></i> Exporting Video</h2>
+        <div class="export-status" id="export-status">Initializing export process...</div>
+        <div class="export-progress">
+            <div class="export-progress-bar" id="export-progress-bar"></div>
+        </div>
+        <div class="export-details">
+            <div>Format: MP4</div>
+            <div>Resolution: <span id="export-resolution">1920x1080</span></div>
+            <div>Frame Rate: <span id="export-fps">60</span> FPS</div>
+            <div>Estimated Time: <span id="export-time">Calculating...</span></div>
+        </div>
+        <div class="export-controls">
+            <button class="export-btn cancel" id="cancel-export">Cancel Export</button>
+        </div>
+    </div>
+    
+    <div class="export-modal" id="confirm-modal" style="display: none;">
+        <h2><i class="fas fa-exclamation-triangle"></i> Confirm Cancellation</h2>
+        <div class="export-status">Are you sure you want to cancel the export?</div>
+        <p style="text-align: center; margin: 15px 0; color: #ff6b6b">All progress will be lost and you'll need to restart the export.</p>
+        <div class="export-controls">
+            <button class="export-btn cancel" id="confirm-cancel">Yes, Cancel</button>
+            <button class="export-btn" style="background: #4ecdc4; color: white;" id="continue-export">No, Continue</button>
+        </div>
+    </div>
+    
+    <div class="export-modal" id="mp3-validation-modal" style="display: none;">
+        <h2><i class="fas fa-exclamation-triangle"></i> MP3 File Required</h2>
+        <div class="export-status">Please upload an MP3 file before exporting</div>
+        <p style="text-align: center; margin: 15px 0;">You need to upload an audio file to create the visualization.</p>
+        <div class="export-controls">
+            <button class="export-btn" style="background: #4ecdc4; color: white;" id="close-validation">OK</button>
+        </div>
+    </div>
+    
+    <div class="export-modal" id="export-complete-modal" style="display: none;">
+        <h2><i class="fas fa-check-circle"></i> Export Complete!</h2>
+        <div class="export-status">Your video has been successfully exported.</div>
+        <div class="export-complete-controls">
+            <button class="export-btn" style="background: #4ecdc4; color: white;" id="download-again">
+                <i class="fas fa-download"></i> Download Again
+            </button>
+            <button class="export-btn cancel" id="close-export">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <div class="filename-modal" id="filename-modal">
+        <h2><i class="fas fa-file-signature"></i> Set Filename</h2>
+        <input type="text" id="filename-input" class="filename-input" placeholder="Enter filename" value="Unnamed 1">
+        <div class="filename-controls">
+            <button class="export-btn cancel" id="cancel-filename">Cancel</button>
+            <button class="export-btn" style="background: #4ecdc4; color: white;" id="confirm-filename">Confirm</button>
+        </div>
+    </div>
+
+    <footer>
+      <span class="footer-highlight">FFmpeg</span>
+      <span style="color:white;">&nbsp;&nbsp;|&nbsp;&nbsp;</span>
+      <span class="footer-highlight">High quality output</span>
+      <p style="color: #9c9cff; font-style: italic; margin-top: 0px;">FFmuvisual.html &copy; 2025 Howwhy</p>
+    </footer>
+    
+    <script>
+        // Initialize variables
+        let fetchFileGlobal = null;
+        let audioContext, audioElement, analyser, source;
+        let audioData = null;
+        let isPlaying = false;
+        let bars = 150;
+        let barHeightMultiplier = 1.0;
+        let topBarColor = "#ffff6e";
+        let bottomBarColor = "#005573";
+        let barRadius = 3;
+        let barOpacity = 1.0;
+        let startDelay = 0; // Delay to show spectrum bars after audio starts
+        let delayTimeout = null;
+        let elements = [];
+        let nextId = 1;
+        let exportInProgress = false;
+        let exportProgress = 0;
+        let exportInterval = null;
+        let lastInteractedElement = null;
+        let currentBackground = 'gradient';
+        let backgroundImage = null;
+        let barFrom = "bottom";
+        let barUntil = "top";
+        let mirrorMode = false;
+        let centerLineThickness = 1;
+        let centerLineLeftColor = "#ffffff";
+        let centerLineRightColor = "#ff6b6b";
+        let ffmpeg = null;
+        let isFFmpegLoaded = false;
+        let exportCanceled = false;
+        let animationId = null;
+        let videoUrl = null;
+        let frameTimes = [];
+        let history = [];
+        let historyIndex = -1;
+        let framesCaptured = 0;
+        let originalVolume = 1.0; // Store original volume
+        let previewWidth = 0, previewHeight = 0; // Store preview canvas dimensions
+        let encodingStartTime = 0;
+        let encodingFrameTimes = [];
+        let exportFilename = "Unnamed 1";
+        let barWidth = 5; // Default bar width in pixels
+        let barGap = 10; // Default gap between bars in pixels
+        
+        // Canvas references
+        const backgroundCanvas = document.getElementById('background-layer');
+        const backgroundCtx = backgroundCanvas.getContext('2d');
+        const visualizerCanvas = document.getElementById('visualizer-layer');
+        const visualizerCtx = visualizerCanvas.getContext('2d');
+        const elementsCanvas = document.getElementById('elements-layer');
+        const elementsCtx = elementsCanvas.getContext('2d');
+        const elementOutline = document.getElementById('element-outline');
+        
+        // Editor references
+        const elementEditor = document.getElementById('element-editor');
+        const editorControls = document.getElementById('editor-controls');
+        const editorTitle = document.getElementById('editor-title');
+
+        function updateFFmpegSolutions() {
+            const ffmpegFix = document.querySelector('.ffmpeg-fix');
+            if (ffmpegFix) {
+                ffmpegFix.innerHTML = `
+                    <h3><i class="fas fa-info-circle"></i> FFmpeg Loading Solutions</h3>
+                    <p>If FFmpeg fails to load, try the following steps:</p>
+                    <ul>
+                        <li>Use the latest version of Chrome or Edge browser</li>
+                        <li>Ensure you're accessing this page using HTTPS/LCH</li>
+                        <li>Close unnecessary browser tabs to free up memory</li>
+                        <li>Restart your browser and try again</li>
+                    </ul>
+                    <button id="retry-ffmpeg" class="btn btn-sm" type="button">Reload FFmpeg</button>
+                `;
+                
+                // Reattach event listener
+                document.getElementById('retry-ffmpeg').addEventListener('click', initFFmpeg);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Fix for color inputs not updating bars
+            function setupColorInputWithUpdate(colorInputId, hexInputId, colorVar) {
+                document.getElementById(colorInputId).addEventListener('input', function() {
+                    window[colorVar] = this.value;
+                    document.getElementById(hexInputId).value = this.value;
+                    redrawVisualizer();
+                });
+                
+                document.getElementById(hexInputId).addEventListener('input', function() {
+                    let value = this.value;
+                    if (!value.startsWith('#')) {
+                        value = '#' + value;
+                        this.value = value;
+                    }
+                    
+                    // Validate hex format
+                    if (/^#([A-Fa-f0-9]{3,4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(value)) {
+                        window[colorVar] = value;
+                        document.getElementById(colorInputId).value = value;
+                        redrawVisualizer();
+                    }
+                });
+
+                document.getElementById('bar-gap').addEventListener('input', function() {
+                    barGap = parseInt(this.value);
+                    document.getElementById('bar-gap-value').textContent = barGap;
+                    redrawVisualizer();
+                });
+                
+                // Bar width control
+                document.getElementById('bar-width').addEventListener('input', function() {
+                    barWidth = parseInt(this.value);
+                    document.getElementById('bar-width-value').textContent = barWidth;
+                    redrawVisualizer();
+                });
+                
+                // Bar count control
+                document.getElementById('bar-count').addEventListener('input', function() {
+                    bars = parseInt(this.value);
+                    document.getElementById('bar-count-value').textContent = bars;
+                    
+                    // Performance warning
+                    const warning = document.getElementById('bar-count-warning');
+                    warning.style.display = bars > 200 ? 'block' : 'none';
+                    
+                    redrawVisualizer();
+                });
+            }
+            
+            // Update existing color inputs with redraw capability
+            setupColorInputWithUpdate('top-bar-color', 'top-bar-hex', 'topBarColor');
+            setupColorInputWithUpdate('bottom-bar-color', 'bottom-bar-hex', 'bottomBarColor');
+            setupColorInputWithUpdate('line-left-color', 'line-left-hex', 'centerLineLeftColor');
+            setupColorInputWithUpdate('line-right-color', 'line-right-hex', 'centerLineRightColor');
+            
+            // Force redraw when color picker is closed
+            document.querySelectorAll('input[type="color"]').forEach(input => {
+                input.addEventListener('change', redrawVisualizer);
+            });
+            
+            // Bar Gap control
+            document.getElementById('bar-gap').addEventListener('input', function() {
+                barGap = parseInt(this.value);
+                document.getElementById('bar-gap-value').textContent = barGap;
+                calculateBarWidth(); // 更新基于新间隙的条宽
+                redrawVisualizer();
+            });
+
+            // Bar Width control
+            document.getElementById('bar-width').addEventListener('input', function() {
+                barWidth = parseInt(this.value);
+                document.getElementById('bar-width-value').textContent = barWidth;
+                
+                // 根据条宽按比例调整条数
+                const newBarCount = Math.max(4, Math.min(1000, Math.floor((visualizerCanvas.width - barGap) / (barWidth + barGap))));
+                bars = newBarCount;
+                document.getElementById('bar-count').value = newBarCount;
+                document.getElementById('bar-count-value').textContent = newBarCount;
+                
+                redrawVisualizer();
+            });
+            
+            // Bar Count control - now linked to bar width
+            document.getElementById('bar-count').addEventListener('input', function() {
+                bars = parseInt(this.value);
+                document.getElementById('bar-count-value').textContent = bars;
+                calculateBarWidth(); // Calculate new bar width
+                redrawVisualizer();
+            });
+            
+            // Volume Control
+            document.getElementById('volume-control').addEventListener('input', function() {
+                if (audioElement) {
+                    const volume = this.value / 100;
+                    audioElement.volume = volume;
+                    document.getElementById('volume-value').textContent = this.value;
+                }
+            });
+        });
+
+        function calculateBarWidth() {
+            const canvasWidth = visualizerCanvas.width;
+            // Total space occupied by gaps between bars
+            const totalGapWidth = barGap * (bars - 1);
+            // Calculate bar width to fit exactly 'bars' bars
+            barWidth = Math.max(1, (canvasWidth - totalGapWidth) / bars);
+            document.getElementById('bar-width-value').textContent = barWidth.toFixed(1);
+        }
+
+        function drawBars(dataArray) {
+            const width = visualizerCanvas.width;
+            const height = visualizerCanvas.height;
+            
+            visualizerCtx.clearRect(0, 0, width, height);
+            
+            // Check if in delay period
+            if (audioElement && audioElement.currentTime < startDelay) {
+                return; // Don't draw spectrum bars during delay
+            }
+            
+            // Calculate total width (all bars and gaps)
+            const totalWidth = barWidth * bars + barGap * (bars - 1);
+            const startX = (width - totalWidth) / 2;
+            let x = startX;
+            
+            // Efficiently calculate bar rounding (no rounding if too many bars)
+            const effectiveBarRadius = bars > 200 ? 0 : Math.min(barRadius, 15);
+            
+            for (let i = 0; i < bars; i++) {
+                // Calculate bar height based on frequency data
+                const barHeight = (dataArray[i] / 255) * height * barHeightMultiplier;
+                
+                // Create vertical gradient
+                const gradient = visualizerCtx.createLinearGradient(0, 0, 0, height);
+                gradient.addColorStop(0, topBarColor);
+                gradient.addColorStop(1, bottomBarColor);
+                
+                visualizerCtx.fillStyle = gradient;
+                visualizerCtx.globalAlpha = barOpacity;
+                
+                let barY = 0;
+                let barDrawHeight = 0;
+                
+                // Calculate position based on bar mode
+                if (barFrom === "bottom" && barUntil === "top") {
+                    barY = height - barHeight;
+                    barDrawHeight = barHeight;
+                }
+                else if (barFrom === "top" && barUntil === "bottom") {
+                    barY = 0;
+                    barDrawHeight = barHeight;
+                }
+                else if (barFrom === "center") {
+                    const centerY = height / 2;
+                    
+                    if (mirrorMode) {
+                        barY = centerY - barHeight/2;
+                        barDrawHeight = barHeight;
+                    } else {
+                        if (barUntil === "top") {
+                            barY = centerY - barHeight;
+                            barDrawHeight = barHeight;
+                        } else if (barUntil === "bottom") {
+                            barY = centerY;
+                            barDrawHeight = barHeight;
+                        }
+                    }
+                }
+                
+                // Draw bar with rounded or straight corners
+                if (effectiveBarRadius > 0) {
+                    visualizerCtx.beginPath();
+                    visualizerCtx.moveTo(x + effectiveBarRadius, barY);
+                    visualizerCtx.arcTo(x + barWidth, barY, x + barWidth, barY + barDrawHeight, effectiveBarRadius);
+                    visualizerCtx.arcTo(x + barWidth, barY + barDrawHeight, x, barY + barDrawHeight, effectiveBarRadius);
+                    visualizerCtx.arcTo(x, barY + barDrawHeight, x, barY, effectiveBarRadius);
+                    visualizerCtx.arcTo(x, barY, x + barWidth, barY, effectiveBarRadius);
+                    visualizerCtx.closePath();
+                    visualizerCtx.fill();
+                } else {
+                    visualizerCtx.fillRect(x, barY, barWidth, barDrawHeight);
+                }
+                
+                // Move to next bar position (current bar width + gap)
+                x += barWidth + barGap;
+            }
+            
+            visualizerCtx.globalAlpha = 1.0;
+        }
+
+        // High resolution bar drawing for export
+        function drawHighResBars(ctx, dataArray, width, height) {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Check if in delay period
+            if (audioElement && audioElement.currentTime < startDelay) {
+                return; // Don't draw spectrum bars during delay
+            }
+            
+            const totalWidth = barWidth * bars + barGap * (bars - 1);
+            const startX = (width - totalWidth) / 2;
+            let x = startX;
+            
+            const effectiveBarRadius = bars > 200 ? 0 : Math.min(barRadius, 15);
+            
+            for (let i = 0; i < bars; i++) {
+                const barHeight = (dataArray[i] / 255) * height * barHeightMultiplier;
+                
+                const gradient = ctx.createLinearGradient(0, 0, 0, height);
+                gradient.addColorStop(0, topBarColor);
+                gradient.addColorStop(1, bottomBarColor);
+                
+                ctx.fillStyle = gradient;
+                ctx.globalAlpha = barOpacity;
+                
+                let barY = 0;
+                let barDrawHeight = 0;
+                
+                if (barFrom === "bottom" && barUntil === "top") {
+                    barY = height - barHeight;
+                    barDrawHeight = barHeight;
+                }
+                else if (barFrom === "top" && barUntil === "bottom") {
+                    barY = 0;
+                    barDrawHeight = barHeight;
+                }
+                else if (barFrom === "center") {
+                    const centerY = height / 2;
+                    
+                    if (mirrorMode) {
+                        barY = centerY - barHeight/2;
+                        barDrawHeight = barHeight;
+                    } else {
+                        if (barUntil === "top") {
+                            barY = centerY - barHeight;
+                            barDrawHeight = barHeight;
+                        } else if (barUntil === "bottom") {
+                            barY = centerY;
+                            barDrawHeight = barHeight;
+                        }
+                    }
+                }
+                
+                if (effectiveBarRadius > 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(x + effectiveBarRadius, barY);
+                    ctx.arcTo(x + barWidth, barY, x + barWidth, barY + barDrawHeight, effectiveBarRadius);
+                    ctx.arcTo(x + barWidth, barY + barDrawHeight, x, barY + barDrawHeight, effectiveBarRadius);
+                    ctx.arcTo(x, barY + barDrawHeight, x, barY, effectiveBarRadius);
+                    ctx.arcTo(x, barY, x + barWidth, barY, effectiveBarRadius);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(x, barY, barWidth, barDrawHeight);
+                }
+                
+                x += barWidth + barGap;
+            }
+            
+            ctx.globalAlpha = 1.0;
+        }
+        
+        // Resize all canvases
+        function resizeCanvases() {
+            const width = backgroundCanvas.offsetWidth;
+            const height = backgroundCanvas.offsetHeight;
+            
+            previewWidth = width;
+            previewHeight = height;
+            
+            backgroundCanvas.width = width;
+            backgroundCanvas.height = height;
+            visualizerCanvas.width = width;
+            visualizerCanvas.height = height;
+            elementsCanvas.width = width;
+            elementsCanvas.height = height;
+            
+            drawBackground();
+            drawElements();
+        }
+        
+        // High resolution background drawing for export
+        function drawHighResBackground(ctx, width, height) {
+            ctx.clearRect(0, 0, width, height);
+            
+            if (backgroundImage) {
+                // Maintain aspect ratio and center the background image
+                const imgRatio = backgroundImage.width / backgroundImage.height;
+                const canvasRatio = width / height;
+                
+                let drawWidth, drawHeight, offsetX, offsetY;
+                
+                if (imgRatio > canvasRatio) {
+                    // Image is wider than canvas
+                    drawHeight = height;
+                    drawWidth = height * imgRatio;
+                    offsetX = (width - drawWidth) / 2;
+                    offsetY = 0;
+                } else {
+                    // Image is taller than canvas
+                    drawWidth = width;
+                    drawHeight = width / imgRatio;
+                    offsetX = 0;
+                    offsetY = (height - drawHeight) / 2;
+                }
+                
+                ctx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+            } else if (currentBackground === 'gradient') {
+                const gradient = ctx.createLinearGradient(0, 0, width, height);
+                gradient.addColorStop(0, '#0f0c29');
+                gradient.addColorStop(1, '#302b63');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+            } 
+            else if (currentBackground === 'luxury1') {
+                ctx.fillStyle = '#212142';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Draw decorative elements
+                ctx.fillStyle = 'rgba(255, 107, 107, 0.3)';
+                ctx.beginPath();
+                ctx.arc(width * 0.3, height * 0.3, width * 0.05, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'rgba(78, 205, 196, 0.3)';
+                ctx.beginPath();
+                ctx.arc(width * 0.7, height * 0.6, width * 0.08, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = 'rgba(91, 134, 229, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(width * 0.1, height * 0.8);
+                ctx.lineTo(width * 0.9, height * 0.2);
+                ctx.stroke();
+            }
+            else if (currentBackground === 'luxury2') {
+                ctx.fillStyle = '#1a1a33';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Draw decorative elements
+                ctx.fillStyle = 'rgba(78, 205, 196, 0.15)';
+                ctx.beginPath();
+                ctx.moveTo(0, height * 0.5);
+                ctx.bezierCurveTo(width * 0.3, height * 0.2, width * 0.7, height * 0.2, width, height * 0.5);
+                ctx.lineTo(width, height * 0.8);
+                ctx.bezierCurveTo(width * 0.7, height * 0.95, width * 0.3, height * 0.95, 0, height * 0.8);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.fillStyle = 'rgba(255, 107, 107, 0.15)';
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.bezierCurveTo(width * 0.3, height * 0.25, width * 0.7, height * 0.25, width, 0);
+                ctx.lineTo(width, height * 0.3);
+                ctx.bezierCurveTo(width * 0.7, height * 0.45, width * 0.3, height * 0.45, 0, height * 0.3);
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            // Draw center line if in center mode and thickness > 0
+            if (barFrom === 'center' && centerLineThickness > 0) {
+                const centerY = height / 2;
+                const gradient = ctx.createLinearGradient(0, centerY, width, centerY);
+                gradient.addColorStop(0, centerLineLeftColor);
+                gradient.addColorStop(1, centerLineRightColor);
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, centerY - centerLineThickness/2, width, centerLineThickness);
+            }
+        }
+
+        // Draw background
+        function drawBackground() {
+            const width = backgroundCanvas.width;
+            const height = backgroundCanvas.height;
+            
+            backgroundCtx.clearRect(0, 0, width, height);
+            
+            if (backgroundImage) {
+                // Maintain aspect ratio and center the background image
+                const imgRatio = backgroundImage.width / backgroundImage.height;
+                const canvasRatio = width / height;
+                
+                let drawWidth, drawHeight, offsetX, offsetY;
+                
+                if (imgRatio > canvasRatio) {
+                    // Image is wider than canvas
+                    drawHeight = height;
+                    drawWidth = height * imgRatio;
+                    offsetX = (width - drawWidth) / 2;
+                    offsetY = 0;
+                } else {
+                    // Image is taller than canvas
+                    drawWidth = width;
+                    drawHeight = width / imgRatio;
+                    offsetX = 0;
+                    offsetY = (height - drawHeight) / 2;
+                }
+                
+                backgroundCtx.drawImage(backgroundImage, offsetX, offsetY, drawWidth, drawHeight);
+            } else if (currentBackground === 'gradient') {
+                const gradient = backgroundCtx.createLinearGradient(0, 0, width, height);
+                gradient.addColorStop(0, '#0f0c29');
+                gradient.addColorStop(1, '#302b63');
+                backgroundCtx.fillStyle = gradient;
+                backgroundCtx.fillRect(0, 0, width, height);
+            } 
+            else if (currentBackground === 'luxury1') {
+                backgroundCtx.fillStyle = '#212142';
+                backgroundCtx.fillRect(0, 0, width, height);
+                
+                // Draw decorative elements
+                backgroundCtx.fillStyle = 'rgba(255, 107, 107, 0.3)';
+                backgroundCtx.beginPath();
+                backgroundCtx.arc(width * 0.3, height * 0.3, width * 0.05, 0, Math.PI * 2);
+                backgroundCtx.fill();
+                
+                backgroundCtx.fillStyle = 'rgba(78, 205, 196, 0.3)';
+                backgroundCtx.beginPath();
+                backgroundCtx.arc(width * 0.7, height * 0.6, width * 0.08, 0, Math.PI * 2);
+                backgroundCtx.fill();
+                
+                backgroundCtx.strokeStyle = 'rgba(91, 134, 229, 0.3)';
+                backgroundCtx.lineWidth = 2;
+                backgroundCtx.beginPath();
+                backgroundCtx.moveTo(width * 0.1, height * 0.8);
+                backgroundCtx.lineTo(width * 0.9, height * 0.2);
+                backgroundCtx.stroke();
+            }
+            else if (currentBackground === 'luxury2') {
+                backgroundCtx.fillStyle = '#1a1a33';
+                backgroundCtx.fillRect(0, 0, width, height);
+                
+                // Draw decorative elements
+                backgroundCtx.fillStyle = 'rgba(78, 205, 196, 0.15)';
+                backgroundCtx.beginPath();
+                backgroundCtx.moveTo(0, height * 0.5);
+                backgroundCtx.bezierCurveTo(width * 0.3, height * 0.2, width * 0.7, height * 0.2, width, height * 0.5);
+                backgroundCtx.lineTo(width, height * 0.8);
+                backgroundCtx.bezierCurveTo(width * 0.7, height * 0.95, width * 0.3, height * 0.95, 0, height * 0.8);
+                backgroundCtx.closePath();
+                backgroundCtx.fill();
+                
+                backgroundCtx.fillStyle = 'rgba(255, 107, 107, 0.15)';
+                backgroundCtx.beginPath();
+                backgroundCtx.moveTo(0, 0);
+                backgroundCtx.bezierCurveTo(width * 0.3, height * 0.25, width * 0.7, height * 0.25, width, 0);
+                backgroundCtx.lineTo(width, height * 0.3);
+                backgroundCtx.bezierCurveTo(width * 0.7, height * 0.45, width * 0.3, height * 0.45, 0, height * 0.3);
+                backgroundCtx.closePath();
+                backgroundCtx.fill();
+            }
+            
+            // Draw center line if in center mode and thickness > 0
+            if (barFrom === 'center' && centerLineThickness > 0) {
+                const centerY = height / 2;
+                const gradient = backgroundCtx.createLinearGradient(0, centerY, width, centerY);
+                gradient.addColorStop(0, centerLineLeftColor);
+                gradient.addColorStop(1, centerLineRightColor);
+                
+                backgroundCtx.fillStyle = gradient;
+                backgroundCtx.fillRect(0, centerY - centerLineThickness/2, width, centerLineThickness);
+            }
+        }
+        
+        window.addEventListener('resize', resizeCanvases);
+        resizeCanvases();
+        
+        // Audio upload handling
+        document.getElementById('audio-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // Show file name
+            document.getElementById('audio-file-name').textContent = file.name;
+            
+            const url = URL.createObjectURL(file);
+            loadAudio(url);
+        });
+        
+        // Volume control
+        document.getElementById('volume-control').addEventListener('input', function() {
+            if (audioElement) {
+                const volume = this.value / 100;
+                audioElement.volume = volume;
+                document.getElementById('volume-value').textContent = this.value;
+            }
+        });
+        
+        // Bar opacity control
+        document.getElementById('bar-opacity').addEventListener('input', function() {
+            barOpacity = this.value / 100;
+            document.getElementById('bar-opacity-value').textContent = this.value;
+        });
+        
+        // Background image upload
+        document.getElementById('bg-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            document.getElementById('bg-file-name').textContent = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    backgroundImage = img;
+                    currentBackground = 'custom';
+                    drawBackground();
+                    
+                    const bgElement = {
+                        id: "bg-" + Date.now(),
+                        type: 'background',
+                        name: 'Background',
+                        visible: true,
+                        opacity: 1.0
+                    };
+                    
+                    if (!elements.some(e => e.type === 'background')) {
+                        elements.push(bgElement);
+                        addElementToList(bgElement);
+                    }
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // Image upload
+        document.getElementById('image-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            document.getElementById('image-file-name').textContent = file.name;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const id = nextId++;
+                    const aspectRatio = img.width / img.height;
+                    
+                    // Set reasonable size based on canvas dimensions
+                    const maxWidth = elementsCanvas.width * 0.3;
+                    const width = Math.min(maxWidth, img.width);
+                    const height = width / aspectRatio;
+                    
+                    const element = {
+                        id: id,
+                        type: 'image',
+                        image: img,
+                        x: elementsCanvas.width / 1,
+                        y: elementsCanvas.height / 1,
+                        width: width,
+                        height: height,
+                        visible: true,
+                        aspectRatio: aspectRatio,
+                        originalWidth: img.width,
+                        originalHeight: img.height,
+                        name: 'Image Element ' + id,
+                        opacity: 1.0,
+                        blur: 0,
+                        delay: 0
+                    };
+                    
+                    elements.push(element);
+                    addElementToList(element);
+                    lastInteractedElement = element;
+                    drawElements();
+                    saveState();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // Load audio function
+        function loadAudio(url) {
+            if (audioElement) {
+                audioElement.pause();
+                document.getElementById('play-pause').innerHTML = '<i class="fas fa-play"></i>';
+                isPlaying = false;
+            }
+            
+            audioElement = new Audio(url);
+            audioElement.crossOrigin = "anonymous";
+            audioElement.volume = document.getElementById('volume-control').value / 100;
+            
+            // Initialize audio analyzer
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+            }
+            
+            source = audioContext.createMediaElementSource(audioElement);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            
+            // Set up audio controls
+            setupAudioControls();
+            
+            // Start visualization
+            visualize();
+            
+            // Update time display
+            audioElement.addEventListener('loadedmetadata', function() {
+                updateTimeDisplay();
+            });
+            
+            // Reset play button when audio ends
+            audioElement.addEventListener('ended', function() {
+                isPlaying = false;
+                document.getElementById('play-pause').innerHTML = '<i class="fas fa-play"></i>';
+            });
+        }
+        
+        // Set up audio controls
+        function setupAudioControls() {
+            const playPauseBtn = document.getElementById('play-pause');
+            const jumpStartBtn = document.getElementById('jump-start');
+            const back1sBtn = document.getElementById('back-1s');
+            const forward1sBtn = document.getElementById('forward-1s');
+            const jumpEndBtn = document.getElementById('jump-end');
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            
+            playPauseBtn.addEventListener('click', function() {
+                togglePlayPause();
+            });
+            
+            jumpStartBtn.addEventListener('click', function() {
+                audioElement.currentTime = 0;
+            });
+            
+            back1sBtn.addEventListener('click', function() {
+                audioElement.currentTime = Math.max(0, audioElement.currentTime - 1);
+            });
+            
+            forward1sBtn.addEventListener('click', function() {
+                audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 1);
+            });
+            
+            jumpEndBtn.addEventListener('click', function() {
+                audioElement.currentTime = audioElement.duration;
+            });
+            
+            progressContainer.addEventListener('click', function(e) {
+                const rect = this.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                audioElement.currentTime = percent * audioElement.duration;
+            });
+            
+            audioElement.addEventListener('timeupdate', function() {
+                const percent = (audioElement.currentTime / audioElement.duration) * 100;
+                progressBar.style.width = percent + '%';
+                updateTimeDisplay();
+            });
+        }
+        
+        // Toggle play/pause
+        function togglePlayPause() {
+            const playPauseBtn = document.getElementById('play-pause');
+            
+            // Check if audio file is loaded
+            if (!audioElement || !audioElement.src) {
+                document.getElementById('mp3-validation-modal').style.display = 'block';
+                document.getElementById('blur-overlay').style.display = 'block';
+                return;
+            }
+            
+            if (isPlaying) {
+                audioElement.pause();
+                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+                cancelAnimationFrame(animationId);
+            } else {
+                // Ensure audio context is in correct state
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume().then(() => {
+                        audioElement.play();
+                        playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                        visualize();
+                    });
+                } else {
+                    audioElement.play();
+                    playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                    visualize();
+                }
+            }
+            isPlaying = !isPlaying;
+        }
+        
+        // Update time display
+        function updateTimeDisplay() {
+            const timeDisplay = document.getElementById('time-display');
+            const formatTime = (seconds) => {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
+            
+            if (audioElement) {
+                timeDisplay.textContent = 
+                    `${formatTime(audioElement.currentTime)} / ${formatTime(audioElement.duration)}`;
+            } else {
+                timeDisplay.textContent = '0:00 / 0:00';
+            }
+        }
+        
+        // Visualization function
+        function visualize() {
+            if (!analyser) return;
+            
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            function draw() {
+                animationId = requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+                drawBars(dataArray);
+                drawElements();
+            }
+            
+            draw();
+        }
+        
+        // High resolution elements drawing for export
+        function drawHighResElements(ctx, width, height) {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Calculate scale factors
+            const scaleX = width / previewWidth;
+            const scaleY = height / previewHeight;
+            
+            elements.forEach(element => {
+                if (element.visible) {
+                    ctx.save();
+                    
+                    // Apply opacity
+                    ctx.globalAlpha = element.opacity;
+                    
+                    // Apply blur if set
+                    if (element.blur > 0) {
+                        ctx.filter = `blur(${element.blur}px)`;
+                    }
+                    
+                    if (element.type === 'text') {
+                        // Scale font size appropriately
+                        const fontSize = element.fontSize * scaleX;
+                        ctx.font = `${fontSize}px ${element.font}`;
+                        ctx.fillStyle = element.color;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(element.text, element.x * scaleX, element.y * scaleY);
+                    } else if (element.type === 'image' && element.image) {
+                        const scaledWidth = element.width * scaleX;
+                        const scaledHeight = element.height * scaleY;
+                        ctx.drawImage(
+                            element.image, 
+                            element.x * scaleX - scaledWidth/2, 
+                            element.y * scaleY - scaledHeight/2, 
+                            scaledWidth, 
+                            scaledHeight
+                        );
+                    } else if (element.type === 'background' && backgroundImage) {
+                        // Background already drawn in background layer
+                    }
+                    
+                    ctx.restore();
+                }
+            });
+        }
+        
+        // Draw all elements on the canvas
+        function drawElements() {
+            elementsCtx.clearRect(0, 0, elementsCanvas.width, elementsCanvas.height);
+            
+            elements.forEach(element => {
+                if (element.visible) {
+                    elementsCtx.save();
+                    
+                    // Apply opacity
+                    elementsCtx.globalAlpha = element.opacity;
+                    
+                    // Apply blur if set
+                    if (element.blur > 0) {
+                        elementsCtx.filter = `blur(${element.blur}px)`;
+                    }
+                    
+                    if (element.type === 'text') {
+                        elementsCtx.font = `${element.fontSize}px ${element.font}`;
+                        elementsCtx.fillStyle = element.color;
+                        elementsCtx.textAlign = 'center';
+                        elementsCtx.textBaseline = 'middle';
+                        elementsCtx.fillText(element.text, element.x, element.y);
+                    } else if (element.type === 'image' && element.image) {
+                        elementsCtx.drawImage(element.image, element.x - element.width/2, element.y - element.height/2, element.width, element.height);
+                    } else if (element.type === 'background' && backgroundImage) {
+                        // Background already drawn
+                    }
+                    
+                    elementsCtx.restore();
+                }
+            });
+            
+            // Draw outline for last interacted element
+            if (lastInteractedElement) {
+                elementOutline.style.display = 'block';
+                elementOutline.style.left = `${lastInteractedElement.x - lastInteractedElement.width/2}px`;
+                elementOutline.style.top = `${lastInteractedElement.y - lastInteractedElement.height/2}px`;
+                elementOutline.style.width = `${lastInteractedElement.width}px`;
+                elementOutline.style.height = `${lastInteractedElement.height}px`;
+            } else {
+                elementOutline.style.display = 'none';
+            }
+        }
+        
+        // Control panel events
+        document.getElementById('bar-count').addEventListener('input', function() {
+            bars = parseInt(this.value);
+            document.getElementById('bar-count-value').textContent = bars;
+            calculateBarWidth(); // Recalculate bar width
+            redrawVisualizer();
+        });
+        
+        document.getElementById('bar-height').addEventListener('input', function() {
+            barHeightMultiplier = this.value / 100;
+            document.getElementById('bar-height-value').textContent = this.value;
+        });
+        
+        document.getElementById('bar-radius').addEventListener('input', function() {
+            barRadius = parseInt(this.value);
+            document.getElementById('bar-radius-value').textContent = barRadius;
+        });
+        
+        // Color input handling with hex values
+        function setupColorInput(colorInputId, hexInputId, colorVar) {
+            document.getElementById(colorInputId).addEventListener('input', function() {
+                window[colorVar] = this.value;
+                document.getElementById(hexInputId).value = this.value;
+            });
+            
+            document.getElementById(hexInputId).addEventListener('input', function() {
+                let value = this.value;
+                if (!value.startsWith('#')) {
+                    value = '#' + value;
+                    this.value = value;
+                }
+                
+                // Validate hex format
+                if (/^#([A-Fa-f0-9]{3,4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(value)) {
+                    window[colorVar] = value;
+                    document.getElementById(colorInputId).value = value;
+                }
+            });
+        }
+        
+        // Set up color inputs
+        setupColorInput('top-bar-color', 'top-bar-hex', 'topBarColor');
+        setupColorInput('bottom-bar-color', 'bottom-bar-hex', 'bottomBarColor');
+        setupColorInput('line-left-color', 'line-left-hex', 'centerLineLeftColor');
+        setupColorInput('line-right-color', 'line-right-hex', 'centerLineRightColor');
+        
+        document.getElementById('delay-input').addEventListener('input', function() {
+            startDelay = parseFloat(this.value) || 0;
+        });
+        
+        // Bar mode selection
+        document.getElementById('from-select').addEventListener('change', function() {
+            barFrom = this.value;
+            
+            // Update until options based on from selection
+            const untilSelect = document.getElementById('until-select');
+            if (barFrom === 'bottom') {
+                untilSelect.innerHTML = '<option value="top">Top</option>';
+                barUntil = "top";
+                document.getElementById('mirror-option').style.display = 'none';
+                document.getElementById('center-line-settings').style.display = 'none';
+            } else if (barFrom === 'top') {
+                untilSelect.innerHTML = '<option value="bottom">Bottom</option>';
+                barUntil = "bottom";
+                document.getElementById('mirror-option').style.display = 'none';
+                document.getElementById('center-line-settings').style.display = 'none';
+            } else if (barFrom === 'center') {
+                untilSelect.innerHTML = '<option value="top">Top</option><option value="bottom">Bottom</option>';
+                barUntil = "top";
+                document.getElementById('mirror-option').style.display = 'flex';
+                document.getElementById('center-line-settings').style.display = 'block';
+            }
+            
+            // Immediately draw center line if needed
+            drawBackground();
+        });
+        
+        document.getElementById('until-select').addEventListener('change', function() {
+            barUntil = this.value;
+        });
+        
+        document.getElementById('mirror-checkbox').addEventListener('change', function() {
+            mirrorMode = this.checked;
+        });
+        
+        // Center line settings
+        document.getElementById('line-thickness').addEventListener('input', function() {
+            centerLineThickness = parseInt(this.value) || 0;
+            drawBackground();
+        });
+        
+        // Background selection
+        document.querySelectorAll('.bg-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.bg-option').forEach(el => {
+                    el.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                if (this.dataset.bg === 'custom') {
+                    document.getElementById('bg-upload-container').style.display = 'block';
+                } else {
+                    document.getElementById('bg-upload-container').style.display = 'none';
+                    currentBackground = this.dataset.bg;
+                    backgroundImage = null;
+                    drawBackground();
+                    
+                    // Remove background element if it exists
+                    const bgIndex = elements.findIndex(e => e.type === 'background');
+                    if (bgIndex !== -1) {
+                        elements.splice(bgIndex, 1);
+                        refreshElementsList();
+                    }
+                }
+            });
+        });
+        
+        // Add text element
+        document.getElementById('add-text').addEventListener('click', function() {
+            const id = nextId++;
+            const element = {
+                id: id,
+                type: 'text',
+                text: 'Your Text',
+                x: elementsCanvas.width / 2,
+                y: elementsCanvas.height / 2,
+                width: 200,
+                height: 50,
+                fontSize: 24,
+                font: 'Arial',
+                color: '#ffffff',
+                visible: true,
+                aspectRatio: 4,
+                name: 'Text Element ' + id,
+                opacity: 1.0,
+                blur: 0,
+                delay: 0
+            };
+            
+            elements.push(element);
+            addElementToList(element);
+            lastInteractedElement = element;
+            drawElements();
+            saveState();
+        });
+        
+        // Add element to the list
+        function addElementToList(element) {
+            const elementsList = document.getElementById('elements-list');
+            const newElement = document.createElement('div');
+            newElement.className = 'element-item';
+            newElement.dataset.id = element.id;
+            
+            newElement.innerHTML = `
+                <div style="display: flex; flex-direction: column; width: 100%;">
+                    <input type="text" class="element-name-input" value="${element.name}" placeholder="Element Name">
+                </div>
+                <div class="element-controls">
+                    <button class="edit-btn" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button class="copy-btn" title="Copy"><i class="fas fa-copy"></i></button>
+                    <button class="delete-btn" title="Delete"><i class="fas fa-trash"></i></button>
+                </div>
+            `;
+            
+            elementsList.appendChild(newElement);
+            
+            // Add event listeners for the buttons
+            newElement.querySelector('.edit-btn').addEventListener('click', () => openEditor(element));
+            newElement.querySelector('.copy-btn').addEventListener('click', () => duplicateElement(element.id));
+            newElement.querySelector('.delete-btn').addEventListener('click', () => deleteElement(element.id));
+            
+            // Name editing
+            const nameInput = newElement.querySelector('.element-name-input');
+            nameInput.addEventListener('change', function() {
+                element.name = this.value;
+            });
+            
+            // Clicking on the element item selects it
+            newElement.addEventListener('click', (e) => {
+                if (!e.target.matches('button') && !e.target.matches('input')) {
+                    lastInteractedElement = element;
+                    drawElements();
+                }
+            });
+        }
+        
+        // Refresh elements list
+        function refreshElementsList() {
+            const elementsList = document.getElementById('elements-list');
+            elementsList.innerHTML = '';
+            elements.forEach(element => addElementToList(element));
+        }
+        
+        // Double-click to edit elements
+        elementsCanvas.addEventListener('dblclick', function(e) {
+            const rect = elementsCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Find clicked element
+            for (let i = elements.length - 1; i >= 0; i--) {
+                const element = elements[i];
+                
+                // Check if click is within element bounds
+                let withinBounds = false;
+                
+                if (element.type === 'text') {
+                    // For text, we use a larger hit area for easier selection
+                    withinBounds = 
+                        x >= element.x - element.width && 
+                        x <= element.x + element.width && 
+                        y >= element.y - element.height/2 && 
+                        y <= element.y + element.height/2;
+                } else if (element.type === 'background') {
+                    // Background covers entire canvas
+                    withinBounds = true;
+                } else {
+                    // For image, use actual dimensions
+                    withinBounds = 
+                        x >= element.x - element.width/2 && 
+                        x <= element.x + element.width/2 && 
+                        y >= element.y - element.height/2 && 
+                        y <= element.y + element.height/2;
+                }
+                
+                if (withinBounds) {
+                    lastInteractedElement = element;
+                    openEditor(element);
+                    drawElements();
+                    saveState();
+                    break;
+                }
+            }
+        });
+        
+        // Open element editor with dynamic controls
+        function openEditor(element) {
+            elementEditor.style.display = 'block';
+            editorControls.innerHTML = '';
+            
+            // Set editor title based on element type
+            editorTitle.innerHTML = `<i class="fas fa-edit"></i> Edit Element (${element.type === 'text' ? 'Text' : element.type === 'background' ? 'Background' : 'Image'})`;
+            
+            // Common properties for all element types
+            const commonControls = `
+                <div class="control-group">
+                    <label for="element-opacity">Opacity: <span id="opacity-value">${Math.round(element.opacity * 100)}</span>%</label>
+                    <input type="range" id="element-opacity" min="0" max="100" value="${Math.round(element.opacity * 100)}">
+                </div>
+                <div class="control-group">
+                    <label for="element-blur">Blur: <span id="blur-value">${element.blur}</span>px</label>
+                    <input type="range" id="element-blur" min="0" max="20" value="${element.blur}">
+                </div>
+                <div class="control-group">
+                    <label for="element-delay">Delay: <span id="delay-value">${element.delay}</span>ms</label>
+                    <input type="range" id="element-delay" min="0" max="10000" value="${element.delay}">
+                </div>
+            `;
+            
+            // Background elements have limited controls
+            if (element.type === 'background') {
+                editorControls.innerHTML = commonControls;
+            } else {
+                editorControls.innerHTML = commonControls + `
+                    <div class="control-group">
+                        <label for="element-x">Position X (0-${elementsCanvas.width})</label>
+                        <div class="editor-slider-container">
+                            <input type="number" id="element-x" min="0" max="${elementsCanvas.width}" value="${element.x}">
+                            <input type="range" id="element-x-range" min="0" max="${elementsCanvas.width}" value="${element.x}">
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label for="element-y">Position Y (0-${elementsCanvas.height})</label>
+                        <div class="editor-slider-container">
+                            <input type="number" id="element-y" min="0" max="${elementsCanvas.height}" value="${element.y}">
+                            <input type="range" id="element-y-range" min="0" max="${elementsCanvas.height}" value="${element.y}">
+                        </div>
+                    </div>
+                `;
+                
+                if (element.type === 'text') {
+                    editorControls.innerHTML += `
+                        <div class="control-group">
+                            <label for="element-text">Text Content</label>
+                            <input type="text" id="element-text" value="${element.text}">
+                        </div>
+                        <div class="control-group">
+                            <label for="font-select">Font</label>
+                            <select id="font-select">
+                                <option value="Arial" ${element.font === 'Arial' ? 'selected' : ''}>Arial</option>
+                                <option value="Verdana" ${element.font === 'Verdana' ? 'selected' : ''}>Verdana</option>
+                                <option value="Georgia" ${element.font === 'Georgia' ? 'selected' : ''}>Georgia</option>
+                                <option value="Courier New" ${element.font === 'Courier New' ? 'selected' : ''}>Courier New</option>
+                                <option value="Impact" ${element.font === 'Impact' ? 'selected' : ''}>Impact</option>
+                                <option value="Comic Sans MS" ${element.font === 'Comic Sans MS' ? 'selected' : ''}>Comic Sans</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="element-font-size">Font Size: <span id="font-size-value">${element.fontSize}</span>px</label>
+                            <input type="range" id="element-font-size" min="10" max="100" value="${element.fontSize}">
+                        </div>
+                        <div class="control-group">
+                            <label for="element-color">Color</label>
+                            <input type="color" id="element-color" value="${element.color}">
+                        </div>
+                    `;
+                } else if (element.type === 'image') {
+                    editorControls.innerHTML += `
+                        <div class="control-group">
+                            <label for="element-width">Width</label>
+                            <div class="editor-slider-container">
+                                <input type="number" id="element-width" min="10" value="${element.width}">
+                                <input type="range" id="element-width-range" min="10" max="${elementsCanvas.width}" value="${element.width}">
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label for="element-height">Height</label>
+                            <div class="editor-slider-container">
+                                <input type="number" id="element-height" min="10" value="${element.height}">
+                                <input type="range" id="element-height-range" min="10" max="${elementsCanvas.height}" value="${element.height}">
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Set up event listeners for the editor controls
+            if (element.type !== 'background') {
+                document.getElementById('element-x').addEventListener('input', function() {
+                    element.x = parseInt(this.value);
+                    document.getElementById('element-x-range').value = element.x;
+                    drawElements();
+                    saveState();
+                });
+                
+                document.getElementById('element-x-range').addEventListener('input', function() {
+                    element.x = parseInt(this.value);
+                    document.getElementById('element-x').value = element.x;
+                    drawElements();
+                    saveState();
+                });
+                
+                document.getElementById('element-y').addEventListener('input', function() {
+                    element.y = parseInt(this.value);
+                    document.getElementById('element-y-range').value = element.y;
+                    drawElements();
+                    saveState();
+                });
+                
+                document.getElementById('element-y-range').addEventListener('input', function() {
+                    element.y = parseInt(this.value);
+                    document.getElementById('element-y').value = element.y;
+                    drawElements();
+                    saveState();
+                });
+                
+                if (element.type === 'image') {
+                    document.getElementById('element-width').addEventListener('input', function() {
+                        element.width = parseInt(this.value);
+                        document.getElementById('element-width-range').value = element.width;
+                        if (document.getElementById('preserve-aspect').checked && element.aspectRatio) {
+                            element.height = element.width / element.aspectRatio;
+                            document.getElementById('element-height').value = Math.round(element.height);
+                            document.getElementById('element-height-range').value = Math.round(element.height);
+                        }
+                        drawElements();
+                        saveState();
+                    });
+                    
+                    document.getElementById('element-width-range').addEventListener('input', function() {
+                        element.width = parseInt(this.value);
+                        document.getElementById('element-width').value = element.width;
+                        if (document.getElementById('preserve-aspect').checked && element.aspectRatio) {
+                            element.height = element.width / element.aspectRatio;
+                            document.getElementById('element-height').value = Math.round(element.height);
+                            document.getElementById('element-height-range').value = Math.round(element.height);
+                        }
+                        drawElements();
+                        saveState();
+                    });
+                    
+                    document.getElementById('element-height').addEventListener('input', function() {
+                        element.height = parseInt(this.value);
+                        document.getElementById('element-height-range').value = element.height;
+                        if (document.getElementById('preserve-aspect').checked && element.aspectRatio) {
+                            element.width = element.height * element.aspectRatio;
+                            document.getElementById('element-width').value = Math.round(element.width);
+                            document.getElementById('element-width-range').value = Math.round(element.width);
+                        }
+                        drawElements();
+                        saveState();
+                    });
+                    
+                    document.getElementById('element-height-range').addEventListener('input', function() {
+                        element.height = parseInt(this.value);
+                        document.getElementById('element-height').value = element.height;
+                        if (document.getElementById('preserve-aspect').checked && element.aspectRatio) {
+                            element.width = element.height * element.aspectRatio;
+                            document.getElementById('element-width').value = Math.round(element.width);
+                            document.getElementById('element-width-range').value = Math.round(element.width);
+                        }
+                        drawElements();
+                        saveState();
+                    });
+                }
+            }
+            
+            document.getElementById('element-opacity').addEventListener('input', function() {
+                element.opacity = this.value / 100;
+                document.getElementById('opacity-value').textContent = this.value;
+                drawElements();
+                saveState();
+            });
+            
+            document.getElementById('element-blur').addEventListener('input', function() {
+                element.blur = parseInt(this.value);
+                document.getElementById('blur-value').textContent = this.value;
+                drawElements();
+                saveState();
+            });
+            
+            document.getElementById('element-delay').addEventListener('input', function() {
+                element.delay = parseInt(this.value);
+                document.getElementById('delay-value').textContent = this.value;
+                saveState();
+            });
+            
+            if (element.type === 'text') {
+                document.getElementById('element-text').addEventListener('input', function() {
+                    element.text = this.value;
+                    drawElements();
+                    saveState();
+                });
+                
+                document.getElementById('font-select').addEventListener('change', function() {
+                    element.font = this.value;
+                    drawElements();
+                    saveState();
+                });
+                
+                document.getElementById('element-font-size').addEventListener('input', function() {
+                    element.fontSize = parseInt(this.value);
+                    document.getElementById('font-size-value').textContent = this.value;
+                    drawElements();
+                    saveState();
+                });
+                
+                document.getElementById('element-color').addEventListener('input', function() {
+                    element.color = this.value;
+                    drawElements();
+                    saveState();
+                });
+            }
+            
+            // Scroll to visualization area
+            document.querySelector('.visualization-area').scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
+            
+            drawElements();
+        }
+        
+        // Close editor
+        document.getElementById('close-editor').addEventListener('click', function() {
+            elementEditor.style.display = 'none';
+            drawElements();
+        });
+        
+        // Editor resize functionality
+        const editorResizeHandle = document.getElementById('editor-resize-handle');
+        let isResizing = false;
+        let startY, startHeight;
+        
+        editorResizeHandle.addEventListener('mousedown', function(e) {
+            isResizing = true;
+            startY = e.clientY;
+            startHeight = parseInt(document.defaultView.getComputedStyle(elementEditor).height, 10);
+            document.documentElement.style.cursor = 'row-resize';
+            document.body.style.userSelect = 'none';
+        });
+        
+        document.addEventListener('mousemove', function(e) {
+            if (!isResizing) return;
+            
+            const height = startHeight - (e.clientY - startY);
+            const minHeight = window.innerHeight * 0.1; // 10% of viewport
+            const maxHeight = window.innerHeight * 0.9; // 90% of viewport
+            
+            if (height >= minHeight && height <= maxHeight) {
+                elementEditor.style.height = height + 'px';
+            }
+        });
+        
+        document.addEventListener('mouseup', function() {
+            isResizing = false;
+            document.documentElement.style.cursor = '';
+            document.body.style.userSelect = '';
+        });
+        
+        // Duplicate element
+        function duplicateElement(id) {
+            const original = elements.find(el => el.id === id);
+            if (!original) return;
+            
+            const clone = JSON.parse(JSON.stringify(original));
+            clone.id = nextId++;
+            clone.x += 20;
+            clone.y += 20;
+            clone.name = original.name + " Copy";
+            
+            elements.push(clone);
+            addElementToList(clone);
+            lastInteractedElement = clone;
+            drawElements();
+            saveState();
+        }
+        
+        // Delete element (including backgrounds)
+        function deleteElement(id) {
+            const elementIndex = elements.findIndex(el => el.id === id);
+            if (elementIndex === -1) return;
+            
+            const deletedElement = elements.splice(elementIndex, 1)[0];
+            
+            // Handle background deletion
+            if (deletedElement.type === 'background') {
+                backgroundImage = null;
+                currentBackground = 'gradient';
+                drawBackground();
+                
+                // Update UI to show gradient as active
+                document.querySelectorAll('.bg-option').forEach(option => {
+                    option.classList.remove('active');
+                });
+                document.querySelector('.bg-option[data-bg="gradient"]').classList.add('active');
+                document.getElementById('bg-upload-container').style.display = 'none';
+            }
+
+            // Remove from list
+            document.querySelectorAll('.element-item').forEach(item => {
+                if (parseInt(item.dataset.id) === id) {
+                    item.remove();
+                }
+            });
+            
+            // Update last interacted element
+            if (lastInteractedElement && lastInteractedElement.id === id) {
+                if (elements.length > 0) {
+                    // Select the element that was added before the deleted one
+                    const newIndex = Math.min(elementIndex, elements.length - 1);
+                    lastInteractedElement = elements[newIndex];
+                } else {
+                    lastInteractedElement = null;
+                }
+            }
+            
+            drawElements();
+            saveState();
+        }
+        
+        // Initialize with sample elements
+        window.addEventListener('load', function() {
+            // Add sample text element
+            const sampleText = {
+                id: nextId++,
+                type: 'text',
+                text: 'Music Visualizer',
+                x: elementsCanvas.width / 2,
+                y: 80,
+                width: 300,
+                height: 50,
+                fontSize: 36,
+                font: 'Arial',
+                color: '#ffffff',
+                visible: true,
+                aspectRatio: 6,
+                name: 'Main Title',
+                opacity: 1.0,
+                blur: 0,
+                delay: 0
+            };
+
+            elements.push(sampleText);
+            addElementToList(sampleText);
+            lastInteractedElement = sampleText;
+            
+            // Set default bar mode
+            document.getElementById('from-select').value = barFrom;
+            document.getElementById('until-select').value = barUntil;
+            
+            // Initialize center line settings
+            centerLineThickness = parseInt(document.getElementById('line-thickness').value) || 1;
+            centerLineLeftColor = document.getElementById('line-left-color').value;
+            centerLineRightColor = document.getElementById('line-right-color').value;
+            
+            // Initialize FFmpeg
+            initFFmpeg();
+            
+            drawElements();
+            saveState();
+        });
+        
+        // Adjuster buttons functionality
+        document.addEventListener('click', function(e) {
+            if (e.target && e.target.matches('.adjuster-btn')) {
+                const targetId = e.target.dataset.target;
+                const direction = e.target.dataset.direction;
+                const input = document.getElementById(targetId);
+                
+                if (input) {
+                    if (input.type === 'range' || input.type === 'number') {
+                        const step = direction === 'up' ? 1 : -1;
+                        if (input.type === 'range') {
+                            input.value = parseInt(input.value) + step;
+                        } else if (input.type === 'number') {
+                            const stepValue = parseFloat(input.step) || 0.5;
+                            input.value = (parseFloat(input.value) + (step * stepValue)).toFixed(1);
+                        }
+                        // 触发input事件，让其他监听器响应
+                        input.dispatchEvent(new Event('input'));
+                    }
+                }
+            }
+        });
+        
+        // Initialize FFmpeg
+        async function initFFmpeg() {
+            // Add cross-origin isolation check
+            if (!crossOriginIsolated) {
+                const errorMsg = "Cross-origin isolation not enabled! Please launch this webside using http or https.";
+                document.getElementById('ffmpeg-status').innerHTML = `
+                <strong style="color:#ff6b6b">${errorMsg}</strong><br>
+                If checked, please try to reload this page.`;
+                throw new Error(errorMsg);
+            }
+
+            try {
+                const { createFFmpeg, fetchFile } = FFmpeg;
+                fetchFileGlobal = fetchFile; // Save fetchFile
+
+                // Increase WebAssembly memory limits
+                WebAssembly.Memory.prototype.grow = function (pages) {
+                    const maxPages = 16384; // 1GB memory
+                    if (this.buffer.byteLength >= maxPages * 64 * 1024) {
+                        return false;
+                    }
+                    return this._grow(pages);
+                };
+                
+                const statusElement = document.getElementById('ffmpeg-status');
+                statusElement.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Loading FFmpeg...`;
+                
+                try {
+                    // Ensure FFmpeg object exists
+                    if (typeof FFmpeg === 'undefined') {
+                        throw new Error("FFmpeg library not loaded");
+                    }
+                    
+                    // Temporary fix for SharedArrayBuffer
+                    if (typeof SharedArrayBuffer === 'undefined') {
+                        window.SharedArrayBuffer = ArrayBuffer;
+                    }
+                    
+                    ffmpeg = createFFmpeg({
+                        log: true,
+                        corePath: 'https://unpkg.com/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js',
+                        mainName: 'main', // Disable multithreading
+                        workerName: 'ffmpeg-worker.js',
+                        wasmPath: 'https://unpkg.com/@ffmpeg/core@0.10.0/dist/ffmpeg-core.wasm'
+                    });
+                    
+                    await ffmpeg.load();
+                    isFFmpegLoaded = true;
+                    console.log("FFmpeg loaded successfully");
+                    statusElement.textContent = "FFmpeg ready";
+                    statusElement.classList.add('ready'); // Add green status
+                } catch (error) {
+                    console.error("FFmpeg loading failed:", error);
+                    statusElement.innerHTML = `
+                        FFmpeg initialization failed: ${error.message}<br>
+                        <ul>
+                            <li>Ensure your browser is up to date (Chrome or Edge recommended)</li>
+                            <li>Try closing other tabs to free memory</li>
+                            <li>Check your network connection</li>
+                        </ul>
+                    `;
+                }
+            } 
+            
+            catch (outerError) {
+                console.error("External initialization error:", outerError);
+                document.getElementById('ffmpeg-status').textContent = `Initialization failed: ${outerError.message}`;
+            }
+        }
+        
+        // Retry FFmpeg initialization
+        document.getElementById('retry-ffmpeg').addEventListener('click', function() {
+            initFFmpeg();
+        });
+        
+        // FFmpeg export function
+        document.getElementById('export-video').addEventListener('click', async function() {
+            if (!audioElement || !audioElement.src) {
+                document.getElementById('mp3-validation-modal').style.display = 'block';
+                document.getElementById('blur-overlay').style.display = 'block';
+                return;
+            }
+            
+            // Show filename modal
+            document.getElementById('filename-modal').style.display = 'block';
+            document.getElementById('blur-overlay').style.display = 'block';
+        });
+        
+        // Confirm filename
+        document.getElementById('confirm-filename').addEventListener('click', function() {
+            const filename = document.getElementById('filename-input').value.trim() || "Unnamed 1";
+            exportFilename = filename;
+            
+            document.getElementById('filename-modal').style.display = 'none';
+            startExport();
+        });
+        
+        // Cancel filename
+        document.getElementById('cancel-filename').addEventListener('click', function() {
+            document.getElementById('filename-modal').style.display = 'none';
+            document.getElementById('blur-overlay').style.display = 'none';
+        });
+        
+        // Start export after filename is confirmed
+        async function startExport() {
+            // Ensure FFmpeg is loaded
+            if (!isFFmpegLoaded) {
+                document.getElementById('export-status').textContent = "FFmpeg is still loading, please wait...";
+                await initFFmpeg();
+                if (!isFFmpegLoaded) {
+                    document.getElementById('export-status').textContent = "FFmpeg loading failed, cannot export";
+                    document.getElementById('blur-overlay').style.display = 'none';
+                    return;
+                }
+            }
+
+            // Store original volume and set to 0
+            originalVolume = audioElement.volume;
+            audioElement.volume = 0;
+            
+            // Update export info
+            const resolution = document.getElementById('resolution-select').value;
+            const fps = parseInt(document.getElementById('fps-select').value);
+            const [width, height] = resolution.split('x').map(Number);
+            
+            document.getElementById('export-resolution').textContent = resolution;
+            document.getElementById('export-fps').textContent = fps;
+            
+            // Show export modal
+            document.getElementById('export-modal').style.display = 'block';
+            exportCanceled = false;
+            exportProgress = 0;
+            document.getElementById('export-progress-bar').style.width = '0%';
+            document.getElementById('export-status').textContent = 'Preparing export...';
+            
+            togglePlayPause();
+
+            try {
+                // Create export canvas
+                const exportCanvas = document.createElement('canvas');
+                exportCanvas.width = width;
+                exportCanvas.height = height;
+                const exportCtx = exportCanvas.getContext('2d');
+                
+                // Save current play state
+                const wasPlaying = isPlaying;
+                const currentTime = audioElement.currentTime;
+                if (isPlaying) {
+                    audioElement.pause();
+                    cancelAnimationFrame(animationId);
+                }
+
+                // Initialize FFmpeg
+                ffmpeg.FS('writeFile', 'audio.mp3', await fetchFileGlobal(audioElement.src));
+
+                // Set export parameters
+                const duration = audioElement.duration;
+                const frameCount = Math.ceil(duration * fps);
+                framesCaptured = 0;
+                frameTimes = [];
+                
+                // Start capturing frames
+                document.getElementById('export-status').textContent = `Capturing frames (0/${frameCount})`;
+                
+                // Frame capture function
+                const captureFrame = async (frameIndex) => {
+                    if (exportCanceled) return;
+
+                    const time = frameIndex / fps;
+                    audioElement.currentTime = time;
+                    
+                    // Wait for seek to complete
+                    await new Promise(resolve => {
+                        const onSeeked = () => {
+                            audioElement.removeEventListener('seeked', onSeeked);
+                            resolve();
+                        };
+                        audioElement.addEventListener('seeked', onSeeked, { once: true });
+                    });
+                    
+                    // Wait for analyzer to update (critical fix: ensure spectrum data is correct)
+                    await new Promise(resolve => {
+                        // Force the analyzer to update by calling getByteFrequencyData
+                        const bufferLength = analyser.frequencyBinCount;
+                        const dataArray = new Uint8Array(bufferLength);
+                        analyser.getByteFrequencyData(dataArray);
+                        
+                        // Add a small delay to ensure the data is properly updated
+                        setTimeout(() => {
+                            resolve();
+                        }, 5); // 5ms delay
+                    });
+                    
+                    // Get spectrum data
+                    const bufferLength = analyser.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+                    analyser.getByteFrequencyData(dataArray);
+
+                    // Create temporary canvases for high resolution drawing
+                    const tempBgCanvas = document.createElement('canvas');
+                    tempBgCanvas.width = width;
+                    tempBgCanvas.height = height;
+                    const tempBgCtx = tempBgCanvas.getContext('2d');
+                    
+                    const tempVisCanvas = document.createElement('canvas');
+                    tempVisCanvas.width = width;
+                    tempVisCanvas.height = height;
+                    const tempVisCtx = tempVisCanvas.getContext('2d');
+                    
+                    const tempElCanvas = document.createElement('canvas');
+                    tempElCanvas.width = width;
+                    tempElCanvas.height = height;
+                    const tempElCtx = tempElCanvas.getContext('2d');
+                    
+                    // Draw to temporary canvases
+                    drawHighResBackground(tempBgCtx, width, height);
+                    drawHighResBars(tempVisCtx, dataArray, width, height);
+                    drawHighResElements(tempElCtx, width, height);
+                    
+                    // Combine layers to export canvas
+                    exportCtx.clearRect(0, 0, width, height);
+                    exportCtx.drawImage(tempBgCanvas, 0, 0);
+                    exportCtx.drawImage(tempVisCanvas, 0, 0);
+                    exportCtx.drawImage(tempElCanvas, 0, 0);
+                    
+                    // Save frame (use PNG for better quality)
+                    const frameData = exportCanvas.toDataURL('image/png');
+                    const imageData = frameData.split(',')[1];
+                    const uint8Array = Uint8Array.from(atob(imageData), c => c.charCodeAt(0));
+                    ffmpeg.FS('writeFile', `frame${frameIndex.toString().padStart(6, '0')}.png`, uint8Array);
+
+                    // Update progress
+                    framesCaptured++;
+                    const progress = Math.min(99, Math.floor((framesCaptured / frameCount) * 100));
+                    document.getElementById('export-progress-bar').style.width = `${progress}%`;
+                    document.getElementById('export-status').textContent = `Capturing frames (${framesCaptured}/${frameCount})`;
+                    
+                    // Update time estimate
+                    const timeEstimate = updateTimeEstimate(framesCaptured, frameCount);
+                    document.getElementById('export-time').textContent = timeEstimate;
+                    
+                    // Continue to next frame or start encoding
+                    if (framesCaptured < frameCount && !exportCanceled) {
+                        setTimeout(() => captureFrame(frameIndex + 1), 10);
+                    } else if (!exportCanceled) {
+                        document.getElementById('export-status').textContent = 'Encoding video...';
+                        encodingStartTime = Date.now();
+                        encodingFrameTimes = [];
+                        await createVideo();
+                    }
+                };
+
+                // Start capturing
+                await captureFrame(0);
+                
+                // Restore play state
+                audioElement.volume = originalVolume;
+                if (wasPlaying) {
+                    audioElement.currentTime = currentTime;
+                    audioElement.play();
+                }
+                
+            } catch (error) {
+                console.error("Export failed:", error);
+                document.getElementById('export-status').textContent = `Export failed: ${error.message}`;
+                document.getElementById('blur-overlay').style.display = 'none';
+                // Restore volume on error
+                audioElement.volume = originalVolume;
+            }
+        }
+        
+        function updateTimeEstimate(framesCaptured, frameCount) {
+            const now = Date.now();
+            frameTimes.push(now);
+            
+            if (frameTimes.length > 10) {
+                const start = frameTimes[0];
+                const end = frameTimes[frameTimes.length - 1];
+                const elapsed = (end - start) / 1000;
+                const fps = frameTimes.length / elapsed;
+                const remaining = (frameCount - framesCaptured) / fps;
+                
+                const hours = Math.floor(remaining / 3600);
+                const mins = Math.floor((remaining % 3600) / 60);
+                const secs = Math.floor(remaining % 60);
+                
+                return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            return "Calculating...";
+        }
+        
+        // Create video with FFmpeg
+        async function createVideo() {
+            try {
+                const fps = parseInt(document.getElementById('fps-select').value);
+                encodingFrameTimes = [];
+                
+                // Run FFmpeg command with ultra high quality settings
+                await ffmpeg.run(
+                    '-framerate', fps.toString(),
+                    '-i', 'frame%06d.png',
+                    '-i', 'audio.mp3',
+                    '-c:v', 'libx264',
+                    '-preset', 'fast',      // Highest Quality Video (slower encoding)
+                    '-crf', '16',               // High quality constant rate factor
+                    '-b:v', '5000k',          // Very high video bitrate (100 Mbps)
+                    '-maxrate', '5000k',
+                    '-bufsize', '5000k',
+                    '-pix_fmt', 'yuv420p',      // Higher quality pixel format
+                    '-profile:v', 'high444',    // Highest quality profile
+                    '-level', '5.2',            // Higher level for better quality
+                    '-x264-params', 'keyint=30:min-keyint=30:scenecut=0',
+                    '-c:a', 'aac',
+                    '-b:a', '320k',             // High quality audio bitrate
+                    '-ar', '48000',             // Sample rate 48kHz
+                    '-shortest',
+                    'output.mp4'
+                );
+                
+                // Get the generated video
+                const videoData = ffmpeg.FS('readFile', 'output.mp4');
+                const videoBlob = new Blob([videoData.buffer], { type: 'video/mp4' });
+                videoUrl = URL.createObjectURL(videoBlob);
+                
+                // Create download link
+                const downloadLink = document.createElement('a');
+                downloadLink.href = videoUrl;
+                downloadLink.download = exportFilename + '.mp4';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                
+                // Hide export modal and show completion modal
+                document.getElementById('export-modal').style.display = 'none';
+                document.getElementById('export-complete-modal').style.display = 'block';
+                
+            } catch (error) {
+                console.error("Video encoding failed:", error);
+                document.getElementById('export-status').textContent = `Video encoding failed: ${error.message}`;
+                document.getElementById('blur-overlay').style.display = 'none';
+            }
+        }
+        
+        // Download again
+        document.getElementById('download-again').addEventListener('click', function() {
+            if (videoUrl) {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = videoUrl;
+                downloadLink.download = exportFilename + '.mp4';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }
+        });
+        
+        // Close export window
+        document.getElementById('close-export').addEventListener('click', function() {
+            document.getElementById('export-complete-modal').style.display = 'none';
+            document.getElementById('blur-overlay').style.display = 'none';
+        });
+        
+        // Cancel export
+        document.getElementById('cancel-export').addEventListener('click', function() {
+            exportCanceled = true;
+            document.getElementById('export-modal').style.display = 'none';
+            document.getElementById('confirm-modal').style.display = 'block';
+            // Restore volume on cancel
+            audioElement.volume = originalVolume;
+        });
+        
+        // Confirm cancel
+        document.getElementById('confirm-cancel').addEventListener('click', function() {
+            exportCanceled = true;
+            document.getElementById('export-modal').style.display = 'none';
+            document.getElementById('blur-overlay').style.display = 'none';
+            document.getElementById('confirm-modal').style.display = 'none';
+        });
+        
+        // Continue export
+        document.getElementById('continue-export').addEventListener('click', function() {
+            document.getElementById('confirm-modal').style.display = 'none';
+            document.getElementById('export-modal').style.display = 'block';
+        });
+        
+        // Close validation modal
+        document.getElementById('close-validation').addEventListener('click', function() {
+            document.getElementById('mp3-validation-modal').style.display = 'none';
+            document.getElementById('blur-overlay').style.display = 'none';
+        });
+        
+        // Shortcut help
+        document.getElementById('shortcut-help').addEventListener('click', function() {
+            document.getElementById('shortcut-panel').style.display = 'block';
+            document.getElementById('blur-overlay').style.display = 'block';
+        });
+        
+        document.getElementById('close-shortcuts').addEventListener('click', function() {
+            document.getElementById('shortcut-panel').style.display = 'none';
+            document.getElementById('blur-overlay').style.display = 'none';
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Space - Play/Pause
+            if (e.key === ' ') {
+                e.preventDefault();
+                togglePlayPause();
+            }
+            // Left arrow - Seek backward 1 second
+            else if (e.key === 'ArrowLeft') {
+                if (audioElement) {
+                    e.preventDefault();
+                    audioElement.currentTime = Math.max(0, audioElement.currentTime - 1);
+                }
+            }
+            // Right arrow - Seek forward 1 second
+            else if (e.key === 'ArrowRight') {
+                if (audioElement) {
+                    e.preventDefault();
+                    audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 1);
+                }
+            }
+            // Shift + Left arrow - Seek backward 5 seconds
+            else if (e.key === 'ArrowLeft' && e.shiftKey) {
+                if (audioElement) {
+                    e.preventDefault();
+                    audioElement.currentTime = Math.max(0, audioElement.currentTime - 5);
+                }
+            }
+            // Shift + Right arrow - Seek forward 5 seconds
+            else if (e.key === 'ArrowRight' && e.shiftKey) {
+                if (audioElement) {
+                    e.preventDefault();
+                    audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 5);
+                }
+            }
+            // Delete - Delete selected element
+            else if (e.key === 'Delete' && lastInteractedElement) {
+                deleteElement(lastInteractedElement.id);
+            }
+            // Escape - Close panels
+            else if (e.key === 'Escape') {
+                document.getElementById('shortcut-panel').style.display = 'none';
+                document.getElementById('export-modal').style.display = 'none';
+                document.getElementById('confirm-modal').style.display = 'none';
+                document.getElementById('element-editor').style.display = 'none';
+                document.getElementById('mp3-validation-modal').style.display = 'none';
+                document.getElementById('export-complete-modal').style.display = 'none';
+                document.getElementById('filename-modal').style.display = 'none';
+                document.getElementById('blur-overlay').style.display = 'none';
+            }
+            // Undo/Redo with Ctrl+Z/Ctrl+Y
+            else if (e.ctrlKey) {
+                if (e.key === 'z') {
+                    e.preventDefault();
+                    undo();
+                } else if (e.key === 'y') {
+                    e.preventDefault();
+                    redo();
+                }
+            }
+        });
+        
+        function saveState() {
+            history = history.slice(0, historyIndex + 1);
+            history.push({
+                elements: JSON.parse(JSON.stringify(elements)),
+                background: currentBackground,
+                backgroundImage: backgroundImage ? backgroundImage.src : null
+            });
+            historyIndex = history.length - 1;
+        }
+
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                restoreState();
+            }
+        }
+
+        function redo() {
+            if (historyIndex < history.length - 1) {
+                historyIndex++;
+                restoreState();
+            }
+        }
+
+        function restoreState() {
+            const state = history[historyIndex];
+            elements = JSON.parse(JSON.stringify(state.elements));
+            
+            if (state.backgroundImage) {
+                const img = new Image();
+                img.onload = () => {
+                    backgroundImage = img;
+                    currentBackground = 'custom';
+                    drawBackground();
+                };
+                img.src = state.backgroundImage;
+            } 
+            else {
+                backgroundImage = null;
+                currentBackground = state.background;
+                drawBackground();
+            }
+            
+            refreshElementsList();
+            drawElements();
+        }
+    </script>
+</body>
+</html>
